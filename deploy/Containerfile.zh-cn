@@ -13,9 +13,10 @@ RUN rm -rf /home/frappe/frappe-bench/apps/frappe/.git /home/frappe/frappe-bench/
 USER frappe
 WORKDIR /home/frappe/frappe-bench
 
-RUN yarn --cwd apps/erpnext/banking install --frozen-lockfile \
+RUN yarn --cwd apps/frappe install --frozen-lockfile \
+	&& yarn --cwd apps/erpnext install --frozen-lockfile \
+	&& yarn --cwd apps/erpnext/banking install --frozen-lockfile \
 	&& yarn --cwd apps/erpnext/banking build \
-	&& yarn install --frozen-lockfile \
 	&& bench build --production \
 	&& bench compile-po-to-mo --app frappe --locale zh --force \
 	&& bench compile-po-to-mo --app erpnext --locale zh --force \
