@@ -16,7 +16,7 @@ frappe.treeview_settings["Company"] = {
 		},
 	],
 	breadcrumb: "Setup",
-	root_label: "All Companies",
+	root_label: __("All Companies"),
 	get_tree_root: false,
 	menu_items: [
 		{

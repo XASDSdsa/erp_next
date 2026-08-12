@@ -1,4 +1,5 @@
 import { FrappeError } from "frappe-react-sdk"
+import _ from "@/lib/translate"
 
 interface ParsedErrorMessage {
     message: string,
@@ -38,7 +39,7 @@ export const getErrorMessages = (error?: FrappeError | null): ParsedErrorMessage
         eMessages.push({
             // @ts-expect-error - some errors have _error_message
             message: error?._error_message,
-            title: "Error",
+			title: _("Error"),
             indicator: "red"
         })
     }
@@ -51,7 +52,7 @@ export const getErrorMessages = (error?: FrappeError | null): ParsedErrorMessage
             if (exception) {
                 eMessages = [{
                     message: exception,
-                    title: "Error"
+				title: _("Error")
                 }]
             }
         }
@@ -59,7 +60,7 @@ export const getErrorMessages = (error?: FrappeError | null): ParsedErrorMessage
         if (eMessages.length === 0) {
             eMessages = [{
                 message: error?.message,
-                title: "Error",
+			title: _("Error"),
                 indicator: "red"
             }]
         }

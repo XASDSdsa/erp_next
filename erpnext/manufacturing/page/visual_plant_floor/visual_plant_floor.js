@@ -1,7 +1,7 @@
 frappe.pages["visual-plant-floor"].on_page_load = function (wrapper) {
 	var page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: "Visual Plant Floor",
+		title: __("Visual Plant Floor"),
 		single_column: true,
 	});
 

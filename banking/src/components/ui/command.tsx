@@ -3,6 +3,7 @@ import { Command as CommandPrimitive } from "cmdk"
 import { SearchIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import _ from "@/lib/translate"
 import {
   Dialog,
   DialogContent,
@@ -28,8 +29,8 @@ function Command({
 }
 
 function CommandDialog({
-  title = "Command Palette",
-  description = "Search for a command to run...",
+  title = _("Command Palette"),
+  description = _("Search for a command to run..."),
   children,
   className,
   showCloseButton = true,

@@ -46,34 +46,34 @@ frappe.ui.form.on("Holiday List", {
 frappe.tour["Holiday List"] = [
 	{
 		fieldname: "holiday_list_name",
-		title: "Holiday List Name",
+		title: __("Holiday List Name"),
 		description: __("Enter a name for this Holiday List."),
 	},
 	{
 		fieldname: "from_date",
-		title: "From Date",
+		title: __("From Date"),
 		description: __("Based on your HR Policy, select your leave allocation period's start date"),
 	},
 	{
 		fieldname: "to_date",
-		title: "To Date",
+		title: __("To Date"),
 		description: __("Based on your HR Policy, select your leave allocation period's end date"),
 	},
 	{
 		fieldname: "weekly_off",
-		title: "Weekly Off",
+		title: __("Weekly Off"),
 		description: __("Select your weekly off day"),
 	},
 	{
 		fieldname: "get_weekly_off_dates",
-		title: "Add Holidays",
+		title: __("Add Holidays"),
 		description: __(
 			"Click on Add to Holidays. This will populate the holidays table with all the dates that fall on the selected weekly off. Repeat the process for populating the dates for all your weekly holidays"
 		),
 	},
 	{
 		fieldname: "holidays",
-		title: "Holidays",
+		title: __("Holidays"),
 		description: __(
 			"Here, your weekly offs are pre-populated based on the previous selections. You can add more rows to also add public and national holidays individually."
 		),

@@ -1,0 +1,7 @@
+frappe-source/.git
+frappe-source/node_modules
+frappe-source/**/__pycache__
+erpnext-source/.git
+erpnext-source/node_modules
+erpnext-source/banking/node_modules
+erpnext-source/**/__pycache__

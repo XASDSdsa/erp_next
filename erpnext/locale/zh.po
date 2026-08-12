@@ -14276,7 +14276,7 @@ msgstr "创建工时表"
 #. Label of an action in the Onboarding Step 'Create Transfer Entry'
 #: erpnext/stock/onboarding_step/create_transfer_entry/create_transfer_entry.json
 msgid "Create Transfer Entry"
-msgstr "创建转账条目"
+msgstr "创建库存调拨单"
 
 #: erpnext/setup/doctype/employee/employee.js:50
 #: erpnext/setup/doctype/employee/employee.js:52
@@ -65614,6 +65614,390 @@ msgstr "{} {} 已经关联了其它 {}"
 #: erpnext/accounts/doctype/party_link/party_link.py:40
 msgid "{} {} is already linked with {} {}"
 msgstr "{} {} 已经关联了 {} {}"
+
+#: erpnext/accounts/doctype/chart_of_accounts_importer/chart_of_accounts_importer.js
+msgid "Template Type"
+msgstr "模板类型"
+
+#: erpnext/accounts/doctype/financial_report_template/financial_report_template.js
+msgid "Tip"
+msgstr "提示"
+
+#: erpnext/buying/doctype/buying_settings/buying_settings.js
+msgid "Purchase Order Required for Purchase Invoice & Receipt Creation"
+msgstr "创建采购发票和采购入库单时必须有采购订单"
+
+#: erpnext/buying/doctype/buying_settings/buying_settings.js
+msgid "Purchase Receipt Required for Purchase Invoice Creation"
+msgstr "创建采购发票时必须有采购入库单"
+
+#: erpnext/crm/doctype/lead/lead.js
+msgid "Prospect Name"
+msgstr "意向客户名称"
+
+#: erpnext/crm/doctype/lead/lead.js
+msgid "Create Contact"
+msgstr "创建联系人"
+
+#: erpnext/manufacturing/doctype/operation/operation.js
+msgid "Operation Name"
+msgstr "工序名称"
+
+#: erpnext/manufacturing/doctype/routing/routing.js
+msgid "BOM Operations"
+msgstr "物料清单工序"
+
+#: erpnext/manufacturing/page/visual_plant_floor/visual_plant_floor.js
+msgid "Visual Plant Floor"
+msgstr "可视化车间"
+
+#: erpnext/public/js/bank_reconciliation_tool/dialog_manager.js
+msgid "Edit in Full Page"
+msgstr "在完整页面中编辑"
+
+#: erpnext/public/js/help_links.js
+msgid "Bulk Rename"
+msgstr "批量重命名"
+
+#: erpnext/public/js/help_links.js
+msgid "New User"
+msgstr "新建用户"
+
+#: erpnext/public/js/help_links.js
+msgid "Rename User"
+msgstr "重命名用户"
+
+#: erpnext/public/js/help_links.js
+msgid "Role Based Permissions"
+msgstr "基于角色的权限"
+
+#: erpnext/public/js/help_links.js
+msgid "Managing Perm Level in Permissions Manager"
+msgstr "在权限管理器中管理权限级别"
+
+#: erpnext/public/js/help_links.js
+msgid "Sharing"
+msgstr "共享"
+
+#: erpnext/public/js/help_links.js
+msgid "Importing and Exporting Data"
+msgstr "数据导入与导出"
+
+#: erpnext/public/js/help_links.js
+msgid "Global Settings"
+msgstr "全局设置"
+
+#: erpnext/public/js/help_links.js
+msgid "Auto Email Reports"
+msgstr "自动发送邮件报表"
+
+#: erpnext/public/js/help_links.js
+msgid "PayPal Settings"
+msgstr "PayPal 设置"
+
+#: erpnext/public/js/help_links.js
+msgid "Razorpay Settings"
+msgstr "Razorpay 设置"
+
+#: erpnext/public/js/help_links.js
+msgid "Dropbox Settings"
+msgstr "Dropbox 设置"
+
+#: erpnext/public/js/help_links.js
+msgid "Stripe Settings"
+msgstr "Stripe 设置"
+
+#: erpnext/public/js/help_links.js
+msgid "Applying Discount"
+msgstr "应用折扣"
+
+#: erpnext/public/js/help_links.js
+msgid "Applying Margin"
+msgstr "应用利润率"
+
+#: erpnext/public/js/help_links.js
+msgid "Setting Up Taxes"
+msgstr "设置税费"
+
+#: erpnext/public/js/help_links.js
+msgid "Recurring Sales Order"
+msgstr "周期性销售订单"
+
+#: erpnext/public/js/help_links.js
+msgid "Drop Shipping"
+msgstr "供应商直运"
+
+#: erpnext/public/js/help_links.js
+msgid "Close Sales Order"
+msgstr "关闭销售订单"
+
+#: erpnext/public/js/help_links.js
+msgid "RFQ Video"
+msgstr "询价单视频"
+
+#: erpnext/public/js/help_links.js
+msgid "Recurring Purchase Order"
+msgstr "周期性采购订单"
+
+#: erpnext/public/js/help_links.js
+msgid "Item UoM"
+msgstr "物料计量单位"
+
+#: erpnext/public/js/help_links.js
+msgid "Supplier Item Code"
+msgstr "供应商物料编码"
+
+#: erpnext/public/js/help_links.js
+msgid "Delete All Related Transactions for a Company"
+msgstr "删除公司的所有相关交易"
+
+#: erpnext/public/js/help_links.js
+msgid "Managing Tree Mastes"
+msgstr "管理树形主数据"
+
+#: erpnext/public/js/help_links.js
+msgid "Accounts Opening Balance"
+msgstr "科目期初余额"
+
+#: erpnext/public/js/help_links.js
+msgid "Recurring Sales Invoice"
+msgstr "周期性销售发票"
+
+#: erpnext/public/js/help_links.js
+msgid "Point of Sale Invoice"
+msgstr "销售点发票"
+
+#: erpnext/public/js/help_links.js
+msgid "Point of Sale Profile"
+msgstr "销售点配置"
+
+#: erpnext/public/js/help_links.js
+msgid "Recurring Purchase Invoice"
+msgstr "周期性采购发票"
+
+#: erpnext/public/js/help_links.js
+msgid "Advance Payment Entry"
+msgstr "预付款凭证"
+
+#: erpnext/public/js/help_links.js
+msgid "Managing Fixed Assets"
+msgstr "管理固定资产"
+
+#: erpnext/public/js/help_links.js
+msgid "Budgeting"
+msgstr "预算管理"
+
+#: erpnext/public/js/help_links.js
+msgid "Item Wise Taxation"
+msgstr "按物料计税"
+
+#: erpnext/public/js/help_links.js
+msgid "Item Codification"
+msgstr "物料编码"
+
+#: erpnext/public/js/help_links.js
+msgid "Item Variants"
+msgstr "物料变体"
+
+#: erpnext/public/js/help_links.js
+msgid "Item Valuation"
+msgstr "物料计价"
+
+#: erpnext/public/js/help_links.js
+msgid "Auto-creation of Material Request"
+msgstr "自动创建物料需求"
+
+#: erpnext/public/js/help_links.js
+msgid "Stock Entry Types"
+msgstr "库存移动类型"
+
+#: erpnext/public/js/help_links.js
+msgid "Repack Entry"
+msgstr "重新包装库存凭证"
+
+#: erpnext/public/js/help_links.js
+msgid "Fractions in UOM"
+msgstr "计量单位中的小数数量"
+
+#: erpnext/public/js/help_links.js
+msgid "Opening Stock Entry"
+msgstr "期初库存凭证"
+
+#: erpnext/public/js/help_links.js
+msgid "Newsletter"
+msgstr "新闻简报"
+
+#: erpnext/public/js/help_links.js
+msgid "Sales Person Target"
+msgstr "销售人员目标"
+
+#: erpnext/public/js/help_links.js
+msgid "Sales Person in Transactions"
+msgstr "交易中的销售人员"
+
+#: erpnext/public/js/help_links.js
+msgid "Bill of Material"
+msgstr "物料清单"
+
+#: erpnext/public/js/help_links.js
+msgid "Nested BOM Structure"
+msgstr "多层物料清单结构"
+
+#: erpnext/public/js/help_links.js
+msgid "Customize Field"
+msgstr "自定义字段"
+
+#: erpnext/selling/doctype/sales_order/sales_order.js
+msgid "Please select Items from the Table"
+msgstr "请从表格中选择物料"
+
+#: erpnext/setup/doctype/employee/employee.js
+msgid "Reports To"
+msgstr "直属上级"
+
+#: erpnext/setup/doctype/holiday_list/holiday_list.js
+msgid "Add Holidays"
+msgstr "添加节假日"
+
+#: erpnext/stock/doctype/delivery_trip/delivery_trip.js
+msgid "Calculating Arrival Times"
+msgstr "正在计算到达时间"
+
+#: erpnext/stock/doctype/delivery_trip/delivery_trip.js
+msgid "Optimizing Route"
+msgstr "正在优化路线"
+
+#: erpnext/stock/doctype/item/item.js
+msgid "Include Item in Manufacturing"
+msgstr "将物料纳入生产"
+
+#: erpnext/stock/report/stock_ledger_invariant_check/stock_ledger_invariant_check.js
+msgid "Show Incorrect Entries"
+msgstr "显示异常分录"
+
+#: erpnext/accounts/doctype/pos_invoice/pos_invoice_list.js
+msgid "Make Merge Log"
+msgstr "创建合并记录"
+
+#: erpnext/accounts/doctype/process_statement_of_accounts/process_statement_of_accounts.js
+msgid "Enter {0} name."
+msgstr "请输入{0}名称。"
+
+#: erpnext/assets/doctype/location/location_tree.js
+msgid "All Locations"
+msgstr "所有地点"
+
+#: erpnext/buying/doctype/purchase_order/purchase_order.js erpnext/public/js/controllers/buying.js
+msgid "Assigning {0} to {1} (row {2})"
+msgstr "正在将 {0} 分配给 {1}（第 {2} 行）"
+
+#: erpnext/buying/doctype/purchase_order/purchase_order.js erpnext/public/js/controllers/buying.js
+msgid "Splitting {0} units of {1}"
+msgstr "正在拆分 {1} 的 {0} 个单位"
+
+#: erpnext/maintenance/doctype/maintenance_schedule/maintenance_schedule.js
+msgid "Create Visit"
+msgstr "创建维护巡修"
+
+#: erpnext/projects/doctype/task/task_tree.js
+msgid "All Tasks"
+msgstr "所有任务"
+
+#: erpnext/public/js/bulk_transaction_processing.js
+msgid "Starting a background job to create {0} {1}"
+msgstr "正在启动后台任务以创建 {0} 个{1}"
+
+#: erpnext/quality_management/doctype/quality_procedure/quality_procedure_tree.js
+msgid "All Quality Procedures"
+msgstr "所有质量程序"
+
+#: erpnext/selling/page/point_of_sale/pos_past_order_summary.js
+msgid "Message (if any)"
+msgstr "附言（如有）"
+
+#: erpnext/selling/page/point_of_sale/pos_past_order_summary.js
+msgid "Print Preview"
+msgstr "打印预览"
+
+#: erpnext/setup/doctype/company/company_tree.js
+msgid "All Companies"
+msgstr "所有公司"
+
+#: banking/src/pages/ViewBankStatementImportLog.tsx
+msgid "Loading..."
+msgstr "正在加载……"
+
+#: banking/src/pages/BankStatementImporter.tsx
+msgid "Date/Transaction Date/Value Date"
+msgstr "日期/交易日期/起息日"
+
+#: banking/src/pages/BankStatementImporter.tsx
+msgid "Withdrawal/Deposit"
+msgstr "支出/收入"
+
+#: banking/src/pages/BankStatementImporter.tsx
+msgid "Description/Particulars/Remarks/Narration/Detail"
+msgstr "说明/摘要/备注/用途/详情"
+
+#: banking/src/pages/BankStatementImporter.tsx
+msgid "Reference/Ref/Transaction ID/Cheque/Check"
+msgstr "参考号/交易编号/支票号"
+
+#: banking/src/components/features/BankReconciliation/BankTransactionUnreconcileModalBody.tsx
+msgid "The following documents will be <strong>cancelled</strong>:"
+msgstr "以下单据将被<strong>取消</strong>："
+
+#: banking/src/components/features/BankReconciliation/RecordPaymentModalContent.tsx
+msgid "Get Unpaid Invoices"
+msgstr "获取未结发票"
+
+#: banking/src/components/features/BankReconciliation/RecordPaymentModalContent.tsx
+msgid "Select Invoices"
+msgstr "选择发票"
+
+#: banking/src/components/features/BankReconciliation/RecordPaymentModalContent.tsx
+msgid "Unpaid invoices from {0} for {1}."
+msgstr "{0} 金额为 {1} 的未结发票。"
+
+#: banking/src/components/features/BankReconciliation/RecordPaymentModalContent.tsx
+msgid "Other Charges / Deductions"
+msgstr "其他费用/扣款"
+
+#: banking/src/components/features/BankReconciliation/MatchAndReconcile.tsx
+msgid "Clear Filters"
+msgstr "清除筛选条件"
+
+#: banking/src/components/features/BankReconciliation/BankBalance.tsx
+msgid "For more information, click on the <strong>Bank Reconciliation Statement</strong> tab below."
+msgstr "如需更多信息，请点击下方的<strong>银行对账单</strong>标签页。"
+
+#: banking/src/components/features/BankReconciliation/BankBalance.tsx
+msgid "Progress"
+msgstr "进度"
+
+#: banking/src/components/features/BankReconciliation/BankRecDateFilter.tsx
+msgid "e.g. Last 3 weeks"
+msgstr "例如：最近 3 周"
+
+#: banking/src/components/ui/command.tsx
+msgid "Command Palette"
+msgstr "命令面板"
+
+#: banking/src/components/ui/command.tsx
+msgid "Search for a command to run..."
+msgstr "搜索要运行的命令……"
+
+#: erpnext/setup/doctype/email_digest/templates/default.html
+msgid "Please take necessary action"
+msgstr "请及时处理"
+
+#: banking/src/components/features/Settings/Rules/RuleList.tsx
+msgid "Drag to reorder"
+msgstr "拖动以调整顺序"
+
+#: banking/src/components/features/Settings/SettingsDialogContent.tsx banking/src/components/features/Settings/Preferences.tsx
+msgid "Preferences"
+msgstr "偏好设置"
 
 #: erpnext/accounts/doctype/bank_transaction/bank_transaction.py:448
 msgid "{} {} is not affecting bank account {}"

@@ -112,7 +112,7 @@ const LinkFieldCombobox = ({
     readOnly,
     disabled,
     filterFn,
-    placeholder = `Select ${doctype}`,
+	placeholder = _("Select {0}", [_(doctype)]),
     customQuery,
     searchfield,
     searchAPIPath = "frappe.desk.search.search_link",

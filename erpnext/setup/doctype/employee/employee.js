@@ -144,33 +144,33 @@ cur_frm.cscript = new erpnext.setup.EmployeeController({
 frappe.tour["Employee"] = [
 	{
 		fieldname: "first_name",
-		title: "First Name",
+		title: __("First Name"),
 		description: __(
 			"Enter First and Last name of Employee, based on Which Full Name will be updated. IN transactions, it will be Full Name which will be fetched."
 		),
 	},
 	{
 		fieldname: "company",
-		title: "Company",
+		title: __("Company"),
 		description: __("Select a Company this Employee belongs to."),
 	},
 	{
 		fieldname: "date_of_birth",
-		title: "Date of Birth",
+		title: __("Date of Birth"),
 		description: __(
 			"Select Date of Birth. This will validate Employees age and prevent hiring of under-age staff."
 		),
 	},
 	{
 		fieldname: "date_of_joining",
-		title: "Date of Joining",
+		title: __("Date of Joining"),
 		description: __(
 			"Select Date of joining. It will have impact on the first salary calculation, Leave allocation on pro-rata bases."
 		),
 	},
 	{
 		fieldname: "reports_to",
-		title: "Reports To",
+		title: __("Reports To"),
 		description: __(
 			"Here, you can select a senior of this Employee. Based on this, Organization Chart will be populated."
 		),

@@ -1,0 +1,22 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+USER root
+
+RUN rm -rf /home/frappe/frappe-bench/apps/frappe /home/frappe/frappe-bench/apps/erpnext
+
+COPY --chown=frappe:frappe frappe-source /home/frappe/frappe-bench/apps/frappe
+COPY --chown=frappe:frappe erpnext-source /home/frappe/frappe-bench/apps/erpnext
+
+RUN rm -rf /home/frappe/frappe-bench/apps/frappe/.git /home/frappe/frappe-bench/apps/erpnext/.git
+
+USER frappe
+WORKDIR /home/frappe/frappe-bench
+
+RUN yarn --cwd apps/erpnext/banking install --frozen-lockfile \
+	&& yarn --cwd apps/erpnext/banking build \
+	&& yarn install --frozen-lockfile \
+	&& bench build --production \
+	&& bench compile-po-to-mo --app frappe --locale zh --force \
+	&& bench compile-po-to-mo --app erpnext --locale zh --force \
+	&& rm -rf apps/erpnext/banking/node_modules node_modules/.cache

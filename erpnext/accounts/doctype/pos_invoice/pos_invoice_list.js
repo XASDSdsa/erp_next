@@ -31,7 +31,7 @@ frappe.listview_settings["POS Invoice"] = {
 	},
 	right_column: "grand_total",
 	onload: function (me) {
-		me.page.add_action_item("Make Merge Log", function () {
+		me.page.add_action_item(__("Make Merge Log"), function () {
 			const invoices = me.get_checked_items();
 			frappe.call({
 				method: "erpnext.accounts.doctype.pos_invoice.pos_invoice.make_merge_log",

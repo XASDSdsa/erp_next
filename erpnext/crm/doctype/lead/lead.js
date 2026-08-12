@@ -118,13 +118,13 @@ erpnext.LeadController = class LeadController extends frappe.ui.form.Controller 
 		if (!existing_prospect) {
 			fields.push(
 				{
-					label: "Create Prospect",
+					label: __("Create Prospect"),
 					fieldname: "create_prospect",
 					fieldtype: "Check",
 					default: 1,
 				},
 				{
-					label: "Prospect Name",
+					label: __("Prospect Name"),
 					fieldname: "prospect_name",
 					fieldtype: "Data",
 					default: frm.doc.company_name,
@@ -149,7 +149,7 @@ erpnext.LeadController = class LeadController extends frappe.ui.form.Controller 
 
 		if (!existing_contact) {
 			fields.push({
-				label: "Create Contact",
+				label: __("Create Contact"),
 				fieldname: "create_contact",
 				fieldtype: "Check",
 				default: "1",

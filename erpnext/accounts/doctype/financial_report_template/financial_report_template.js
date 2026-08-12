@@ -192,7 +192,7 @@ function show_accounts_tree(template_rows, has_selection) {
 			{
 				fieldname: "tip",
 				fieldtype: "HTML",
-				label: "Tip",
+				label: __("Tip"),
 				options: `
 					<div class="alert alert-success" role="alert">
 							Tip: Select report lines to view their accounts

@@ -988,26 +988,26 @@ frappe.ui.form.on("BOM Item", "items_remove", function (frm) {
 frappe.tour["BOM"] = [
 	{
 		fieldname: "item",
-		title: "Item",
+		title: __("Item"),
 		description: __(
 			"Select the Item to be manufactured. The Item name, UoM, Company, and Currency will be fetched automatically."
 		),
 	},
 	{
 		fieldname: "quantity",
-		title: "Quantity",
+		title: __("Quantity"),
 		description: __(
 			"Enter the quantity of the Item that will be manufactured from this Bill of Materials."
 		),
 	},
 	{
 		fieldname: "with_operations",
-		title: "With Operations",
+		title: __("With Operations"),
 		description: __("To add Operations tick the 'With Operations' checkbox."),
 	},
 	{
 		fieldname: "items",
-		title: "Raw Materials",
+		title: __("Raw Materials"),
 		description: __("Select the raw materials (Items) required to manufacture the Item"),
 	},
 ];

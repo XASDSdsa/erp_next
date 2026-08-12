@@ -30,7 +30,7 @@ frappe.treeview_settings["Task"] = {
 	],
 	breadcrumb: "Projects",
 	get_tree_root: false,
-	root_label: "All Tasks",
+	root_label: __("All Tasks"),
 	ignore_fields: ["parent_task"],
 	onload: function (me) {
 		frappe.treeview_settings["Task"].page = {};

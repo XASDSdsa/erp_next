@@ -1261,52 +1261,52 @@ frappe.ui.form.on("UOM Conversion Detail", {
 frappe.tour["Item"] = [
 	{
 		fieldname: "item_code",
-		title: "Item Code",
+		title: __("Item Code"),
 		description: __(
 			"Enter an Item Code, the name will be auto-filled the same as Item Code on clicking inside the Item Name field."
 		),
 	},
 	{
 		fieldname: "item_group",
-		title: "Item Group",
+		title: __("Item Group"),
 		description: __("Select an Item Group."),
 	},
 	{
 		fieldname: "is_stock_item",
-		title: "Maintain Stock",
+		title: __("Maintain Stock"),
 		description: __(
 			"If you are maintaining stock of this Item in your Inventory, ERPNext will make a stock ledger entry for each transaction of this item."
 		),
 	},
 	{
 		fieldname: "include_item_in_manufacturing",
-		title: "Include Item in Manufacturing",
+		title: __("Include Item in Manufacturing"),
 		description: __(
 			"This is for raw material Items that'll be used to create finished goods. If the Item is an additional service like 'washing' that'll be used in the BOM, keep this unchecked."
 		),
 	},
 	{
 		fieldname: "opening_stock",
-		title: "Opening Stock",
+		title: __("Opening Stock"),
 		description: __("Enter the opening stock units."),
 	},
 	{
 		fieldname: "valuation_rate",
-		title: "Valuation Rate",
+		title: __("Valuation Rate"),
 		description: __(
 			"There are two options to maintain valuation of stock. FIFO (first in - first out) and Moving Average. To understand this topic in detail please visit <a href='https://docs.frappe.io/erpnext/user/manual/en/calculation-of-valuation-rate-in-fifo-and-moving-average' target='_blank'>Item Valuation, FIFO and Moving Average.</a>"
 		),
 	},
 	{
 		fieldname: "standard_rate",
-		title: "Standard Selling Rate",
+		title: __("Standard Selling Rate"),
 		description: __(
 			"When creating an Item, entering a value for this field will automatically create an Item Price at the backend."
 		),
 	},
 	{
 		fieldname: "item_defaults",
-		title: "Item Defaults",
+		title: __("Item Defaults"),
 		description: __(
 			"In this section, you can define Company-wide transaction-related defaults for this Item. Eg. Default Warehouse, Default Price List, Supplier, etc."
 		),

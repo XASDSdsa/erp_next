@@ -80,7 +80,7 @@ const ClosingBalance = () => {
                             <br />
                             {_("If your bank statement shows a different closing balance, it is because all transactions have not reconciled yet.")}
                             <br /><br />
-                            For more information, click on the <strong>Bank Reconciliation Statement</strong> tab below.
+							<span dangerouslySetInnerHTML={{ __html: _("For more information, click on the <strong>Bank Reconciliation Statement</strong> tab below.") }} />
                         </Paragraph>
                     </HoverCardContent>
                 </HoverCard>
@@ -138,7 +138,7 @@ const ReconcileProgress = () => {
                 value={progress}
                 max={100}
                 size="md"
-                label="Progress"
+				label={_("Progress")}
                 hint
                 hintText={`${reconciledCount} / ${totalCount} ${_("reconciled")}`} />
         </div>
