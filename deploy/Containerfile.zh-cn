@@ -1,4 +1,4 @@
-ARG BASE_IMAGE
+ARG BASE_IMAGE=leya/erpnext:v16.32.0-xasdsdsa-81a6f975
 FROM ${BASE_IMAGE}
 
 USER root

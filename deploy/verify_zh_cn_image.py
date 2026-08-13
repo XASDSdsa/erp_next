@@ -4,6 +4,8 @@ import json
 from gettext import GNUTranslations
 from pathlib import Path
 
+from babel.messages.pofile import read_po
+
 
 BENCH_ROOT = Path("/home/frappe/frappe-bench")
 ASSETS_ROOT = BENCH_ROOT / "sites" / "assets"
@@ -33,8 +35,11 @@ REQUIRED_BUNDLES = {
 }
 
 
-def load_manifest() -> dict[str, str]:
-	manifest_path = ASSETS_ROOT / "assets.json"
+def load_manifest(filename: str, *, required: bool = True) -> dict[str, str]:
+	manifest_path = ASSETS_ROOT / filename
+	if not manifest_path.exists() and not required:
+		return {}
+
 	manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 	if not isinstance(manifest, dict):
 		raise AssertionError(f"Invalid asset manifest: {manifest_path}")
@@ -52,11 +57,7 @@ def verify_asset_layout() -> None:
 		)
 
 
-def verify_assets(manifest: dict[str, str]) -> None:
-	missing_bundles = sorted(REQUIRED_BUNDLES - manifest.keys())
-	if missing_bundles:
-		raise AssertionError(f"Required bundles missing from assets.json: {missing_bundles}")
-
+def verify_assets(manifest: dict[str, str], manifest_name: str) -> None:
 	missing_files = []
 	for bundle, public_path in manifest.items():
 		if not isinstance(public_path, str) or not public_path.startswith("/assets/"):
@@ -71,7 +72,10 @@ def verify_assets(manifest: dict[str, str]) -> None:
 			missing_files.append(f"{bundle} -> {asset_path}")
 
 	if missing_files:
-		raise AssertionError("Asset files missing or empty:\n" + "\n".join(missing_files))
+		raise AssertionError(
+			f"Asset files from {manifest_name} are missing or empty:\n"
+			+ "\n".join(missing_files)
+		)
 
 
 def load_translations(app: str) -> GNUTranslations:
@@ -98,14 +102,58 @@ def verify_translations() -> None:
 		)
 
 
+def verify_translation_coverage() -> int:
+	message_count = 0
+	problems = []
+
+	for app in ("frappe", "erpnext"):
+		po_path = BENCH_ROOT / "apps" / app / app / "locale" / "zh.po"
+		with po_path.open("rb") as po_file:
+			catalog = read_po(po_file)
+
+		for message in catalog:
+			if not message.id:
+				continue
+
+			message_count += 1
+			if "fuzzy" in message.flags:
+				problems.append(f"{app}: fuzzy: {message.id!r}")
+				continue
+
+			translation = message.string
+			if isinstance(translation, tuple):
+				missing = not translation or any(not value for value in translation)
+			else:
+				missing = not translation
+
+			if missing:
+				problems.append(f"{app}: untranslated: {message.id!r}")
+
+	if problems:
+		details = "\n".join(problems[:50])
+		if len(problems) > 50:
+			details += f"\n... and {len(problems) - 50} more"
+		raise AssertionError(f"Simplified Chinese PO coverage failed:\n{details}")
+
+	return message_count
+
+
 def main() -> None:
 	verify_asset_layout()
-	manifest = load_manifest()
-	verify_assets(manifest)
+	manifest = load_manifest("assets.json")
+	rtl_manifest = load_manifest("assets-rtl.json", required=False)
+	missing_bundles = sorted(REQUIRED_BUNDLES - manifest.keys())
+	if missing_bundles:
+		raise AssertionError(f"Required bundles missing from assets.json: {missing_bundles}")
+	verify_assets(manifest, "assets.json")
+	verify_assets(rtl_manifest, "assets-rtl.json")
 	verify_translations()
+	message_count = verify_translation_coverage()
 	print(
 		"ZH_CN_IMAGE_VERIFICATION_OK "
-		f"assets={len(manifest)} translations={len(EXPECTED_TRANSLATIONS)}"
+		f"assets={len(manifest)} rtl_assets={len(rtl_manifest)} "
+		f"sampled_translations={len(EXPECTED_TRANSLATIONS)} "
+		f"translated_messages={message_count}"
 	)
 
 
