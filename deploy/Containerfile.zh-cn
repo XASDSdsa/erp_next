@@ -8,7 +8,14 @@ RUN rm -rf /home/frappe/frappe-bench/apps/frappe /home/frappe/frappe-bench/apps/
 COPY --chown=frappe:frappe frappe-source /home/frappe/frappe-bench/apps/frappe
 COPY --chown=frappe:frappe erpnext-source /home/frappe/frappe-bench/apps/erpnext
 
-RUN rm -rf /home/frappe/frappe-bench/apps/frappe/.git /home/frappe/frappe-bench/apps/erpnext/.git
+RUN rm -rf \
+		/home/frappe/frappe-bench/apps/frappe/.git \
+		/home/frappe/frappe-bench/apps/erpnext/.git \
+		/home/frappe/frappe-bench/sites/assets \
+	&& ln -s \
+		/home/frappe/frappe-bench/assets \
+		/home/frappe/frappe-bench/sites/assets \
+	&& chown -h frappe:frappe /home/frappe/frappe-bench/sites/assets
 
 USER frappe
 WORKDIR /home/frappe/frappe-bench

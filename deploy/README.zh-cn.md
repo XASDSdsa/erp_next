@@ -33,6 +33,18 @@ docker run --rm \
   apps/erpnext/deploy/verify_zh_cn_image.py
 ```
 
+Run the same verification with the production sites volume mounted read-only.
+This confirms that the volume's absolute `sites/assets` symlink resolves to the
+new image assets:
+
+```bash
+docker run --rm \
+  -v frappe_docker_sites:/home/frappe/frappe-bench/sites:ro \
+  --entrypoint /home/frappe/frappe-bench/env/bin/python \
+  "$ZH_IMAGE" \
+  apps/erpnext/deploy/verify_zh_cn_image.py
+```
+
 Application assets are immutable image contents. Never run `bench build` in a
 production application container because each service has its own image layer.
 Rebuild and verify a new image, then recreate all application services together.

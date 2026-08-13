@@ -7,6 +7,7 @@ from pathlib import Path
 
 BENCH_ROOT = Path("/home/frappe/frappe-bench")
 ASSETS_ROOT = BENCH_ROOT / "sites" / "assets"
+IMAGE_ASSETS_ROOT = BENCH_ROOT / "assets"
 
 EXPECTED_TRANSLATIONS = {
 	"Brand": "品牌",
@@ -38,6 +39,17 @@ def load_manifest() -> dict[str, str]:
 	if not isinstance(manifest, dict):
 		raise AssertionError(f"Invalid asset manifest: {manifest_path}")
 	return manifest
+
+
+def verify_asset_layout() -> None:
+	if not ASSETS_ROOT.is_symlink():
+		raise AssertionError(f"Expected asset symlink: {ASSETS_ROOT}")
+
+	resolved_assets_root = ASSETS_ROOT.resolve(strict=True)
+	if resolved_assets_root != IMAGE_ASSETS_ROOT:
+		raise AssertionError(
+			f"Asset symlink resolves to {resolved_assets_root}, expected {IMAGE_ASSETS_ROOT}"
+		)
 
 
 def verify_assets(manifest: dict[str, str]) -> None:
@@ -87,6 +99,7 @@ def verify_translations() -> None:
 
 
 def main() -> None:
+	verify_asset_layout()
 	manifest = load_manifest()
 	verify_assets(manifest)
 	verify_translations()
