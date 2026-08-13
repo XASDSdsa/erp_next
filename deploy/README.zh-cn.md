@@ -21,3 +21,18 @@ docker build \
 ```
 
 Always pin and verify both Git commits before building. Deploy the resulting image to backend, frontend, websocket, queue, and scheduler services together.
+
+The image build fails unless every path in `assets.json` exists and the required
+Simplified Chinese translations are present in the compiled MO files. Verify the
+finished image before deployment:
+
+```bash
+docker run --rm \
+  --entrypoint /home/frappe/frappe-bench/env/bin/python \
+  "$ZH_IMAGE" \
+  apps/erpnext/deploy/verify_zh_cn_image.py
+```
+
+Application assets are immutable image contents. Never run `bench build` in a
+production application container because each service has its own image layer.
+Rebuild and verify a new image, then recreate all application services together.

@@ -20,4 +20,5 @@ RUN yarn --cwd apps/frappe install --frozen-lockfile \
 	&& bench build --production \
 	&& bench compile-po-to-mo --app frappe --locale zh --force \
 	&& bench compile-po-to-mo --app erpnext --locale zh --force \
-    && rm -rf node_modules/.cache
+	&& env/bin/python apps/erpnext/deploy/verify_zh_cn_image.py \
+	&& rm -rf node_modules/.cache
