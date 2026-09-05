@@ -17,6 +17,7 @@ from erpnext.accounts.utils import get_account_currency
 from erpnext.assets.doctype.asset.asset import get_asset_account, is_cwip_accounting_enabled
 from erpnext.controllers.accounts_controller import merge_taxes
 from erpnext.controllers.buying_controller import BuyingController
+from erpnext.controllers.mapper import get_qty_already_mapped
 from erpnext.stock import get_warehouse_account
 from erpnext.stock.doctype.delivery_note.delivery_note import make_inter_company_transaction
 from erpnext.stock.doctype.stock_reservation_entry.stock_reservation_entry import StockReservation
@@ -264,7 +265,7 @@ class PurchaseReceipt(BuyingController):
 		self.validate_cwip_accounts()
 		self.validate_provisional_expense_account()
 
-		self.check_for_on_hold_or_closed_status("Purchase Order", "purchase_order")
+		self.check_purchase_order_on_hold_or_close("purchase_order")
 
 		if getdate(self.posting_date) > getdate(nowdate()):
 			throw(_("Posting Date cannot be future date"))
@@ -437,7 +438,7 @@ class PurchaseReceipt(BuyingController):
 	def on_cancel(self):
 		super().on_cancel()
 
-		self.check_for_on_hold_or_closed_status("Purchase Order", "purchase_order")
+		self.check_purchase_order_on_hold_or_close("purchase_order")
 
 		self.update_prevdoc_status()
 		self.update_billing_status()
@@ -1517,6 +1518,8 @@ def make_purchase_invoice(source_name, target_doc=None, args=None):
 	doc = frappe.get_doc("Purchase Receipt", source_name)
 	returned_qty_map = get_returned_qty_map(source_name)
 	invoiced_qty_map = get_invoiced_qty_map(source_name)
+	for ref, qty in get_qty_already_mapped(target_doc, "pr_detail").items():
+		invoiced_qty_map[ref] = invoiced_qty_map.get(ref, 0) + qty
 
 	def set_missing_values(source, target):
 		if len(target.get("items")) == 0:
@@ -1602,7 +1605,7 @@ def make_purchase_invoice(source_name, target_doc=None, args=None):
 				},
 				"postprocess": update_item,
 				"filter": lambda d: (
-					get_pending_qty(d)[0] <= 0 if not doc.get("is_return") else get_pending_qty(d)[0] > 0
+					get_pending_qty(d)[0] <= 0 if not doc.get("is_return") else get_pending_qty(d)[0] >= 0
 				),
 				"condition": select_item,
 			},

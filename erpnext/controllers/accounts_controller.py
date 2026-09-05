@@ -738,6 +738,8 @@ class AccountsController(TransactionBase):
 			self.validate_non_invoice_documents_schedule()
 
 	def before_print(self, settings=None):
+		self.set_missing_terms()
+
 		if self.doctype in [
 			"Purchase Order",
 			"Sales Order",
@@ -760,6 +762,16 @@ class AccountsController(TransactionBase):
 
 		set_print_templates_for_item_table(self, settings)
 		set_print_templates_for_taxes(self, settings)
+
+	def set_missing_terms(self):
+		if not self.get("tc_name") or self.get("terms"):
+			return
+
+		from erpnext.setup.doctype.terms_and_conditions.terms_and_conditions import (
+			get_terms_and_conditions,
+		)
+
+		self.terms = get_terms_and_conditions(self.tc_name, self.as_dict())
 
 	def calculate_paid_amount(self):
 		if hasattr(self, "is_pos") or hasattr(self, "is_paid"):
@@ -1293,6 +1305,11 @@ class AccountsController(TransactionBase):
 		if self.get("taxes") or self.get("is_pos"):
 			return
 
+		# set by the Opening Invoice Creation Tool, where the outstanding amount
+		# entered against a party is already inclusive of tax
+		if self.flags.dont_auto_add_taxes:
+			return
+
 		if frappe.get_single_value(
 			"Accounts Settings", "add_taxes_from_taxes_and_charges_template"
 		) and hasattr(self, "taxes_and_charges"):
@@ -1409,9 +1426,12 @@ class AccountsController(TransactionBase):
 		dimension_dict = frappe._dict()
 
 		for dimension in accounting_dimensions:
-			dimension_dict[dimension] = self.get(dimension)
+			value = self.get(dimension)
 			if item and item.get(dimension):
-				dimension_dict[dimension] = item.get(dimension)
+				value = item.get(dimension)
+			if isinstance(value, list | dict):
+				continue
+			dimension_dict[dimension] = value
 
 		gl_dict.update(dimension_dict)
 		gl_dict.update(args)

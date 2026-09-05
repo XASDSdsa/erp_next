@@ -6,7 +6,7 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils.user import is_website_user
 
-__version__ = "16.32.0"
+__version__ = "16.34.1"
 
 
 def get_default_company(user=None):
@@ -177,7 +177,12 @@ def normalize_ctx_input(T: type) -> callable:
 
 	def decorator(func: callable):
 		# conserve annotations for frappe.utils.typing_validations
-		@functools.wraps(func, assigned=(a for a in functools.WRAPPER_ASSIGNMENTS if a != "__annotations__"))
+		@functools.wraps(
+			func,
+			assigned=(
+				a for a in functools.WRAPPER_ASSIGNMENTS if a not in ("__annotations__", "__annotate__")
+			),
+		)
 		def wrapper(ctx: T | Document | dict | str, *args, **kwargs):
 			if isinstance(ctx, Document):
 				ctx = T(**ctx.as_dict())

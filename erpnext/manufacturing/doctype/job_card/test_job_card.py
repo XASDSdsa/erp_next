@@ -20,7 +20,7 @@ from erpnext.manufacturing.doctype.job_card.job_card import (
 	make_stock_entry as make_stock_entry_from_jc,
 )
 from erpnext.manufacturing.doctype.work_order.test_work_order import make_wo_order_test_record
-from erpnext.manufacturing.doctype.work_order.work_order import WorkOrder, make_work_order
+from erpnext.manufacturing.doctype.work_order.work_order import WorkOrder, make_job_card, make_work_order
 from erpnext.manufacturing.doctype.workstation.test_workstation import make_workstation
 from erpnext.patches.v16_0.set_stock_uom_in_job_card import execute as set_stock_uom_in_job_card
 from erpnext.stock.doctype.item.test_item import create_item
@@ -317,6 +317,43 @@ class TestJobCard(ERPNextTestSuite):
 		# 'For Quantity' here will be 0 since
 		# transfer was made for 2 fg qty in first transfer Stock Entry
 		self.assertEqual(transfer_entry_2.fg_completed_qty, 0)
+
+	def test_material_request_stock_entry_uses_job_card_coverage(self):
+		from erpnext.stock.doctype.material_request.material_request import make_stock_entry
+
+		self.transfer_material_against = "Job Card"
+		self.source_warehouse = "Stores - _TC"
+		job_card = frappe.get_last_doc("Job Card", {"work_order": self.work_order.name})
+		mr = make_material_request(job_card.name)
+		mr.schedule_date = today()
+		for row in mr.items:
+			row.qty = flt(row.qty) / 2
+			row.stock_qty = flt(row.stock_qty) / 2
+		mr.submit()
+
+		stock_entry = make_stock_entry(mr.name)
+		self.assertEqual(stock_entry.fg_completed_qty, job_card.for_quantity / 2)
+
+		selected_row = mr.items[0]
+		try:
+			frappe.flags.selected_children = {"items": [selected_row.name]}
+			selected_stock_entry = make_stock_entry(mr.name)
+		finally:
+			frappe.flags.selected_children = None
+
+		self.assertEqual(
+			[row.job_card_item for row in selected_stock_entry.items], [selected_row.job_card_item]
+		)
+		self.assertEqual(selected_stock_entry.fg_completed_qty, 0)
+
+		for row in mr.items:
+			transferred_qty = flt(row.stock_qty) / 2
+			frappe.db.set_value("Job Card Item", row.job_card_item, "transferred_qty", transferred_qty)
+			frappe.db.set_value(row.doctype, row.name, "ordered_qty", transferred_qty)
+		mr.reload()
+
+		repeated_stock_entry = make_stock_entry(mr.name)
+		self.assertEqual(repeated_stock_entry.fg_completed_qty, job_card.for_quantity / 4)
 
 	@ERPNextTestSuite.change_settings("Manufacturing Settings", {"job_card_excess_transfer": 1})
 	def test_job_card_excess_material_transfer(self):
@@ -731,6 +768,7 @@ class TestJobCard(ERPNextTestSuite):
 		self.assertEqual(ste.job_card, job_card_name)
 		self.assertEqual(ste.from_bom, 1.0)
 		self.assertEqual(ste.bom_no, work_order.bom_no)
+		self.assertEqual(ste.fg_completed_qty, frappe.get_value("Job Card", job_card_name, "for_quantity"))
 
 	def test_job_card_material_transfer_via_pick_list(self):
 		from erpnext.stock.doctype.material_request.material_request import create_pick_list
@@ -913,6 +951,146 @@ class TestJobCard(ERPNextTestSuite):
 
 		self.assertEqual(wo_doc.produced_qty, 8)
 		self.assertEqual(wo_doc.process_loss_qty, 2)
+		self.assertEqual(wo_doc.status, "Completed")
+
+	def make_two_operation_work_order(self, qty=10):
+		from erpnext.manufacturing.doctype.routing.test_routing import (
+			create_routing,
+			setup_bom,
+			setup_operations,
+		)
+		from erpnext.stock.doctype.item.test_item import make_item
+		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
+
+		operations = [
+			{"operation": "Test Operation A1", "workstation": "Test Workstation A", "time_in_mins": 30},
+			{"operation": "Test Operation B1", "workstation": "Test Workstation A", "time_in_mins": 20},
+		]
+
+		warehouse = create_warehouse("Test Warehouse 123 for Job Card")
+		setup_operations(operations)
+
+		item_code = "Test Job Card Process Qty Item"
+		for item in [item_code, item_code + "RM 1", item_code + "RM 2"]:
+			if not frappe.db.exists("Item", item):
+				make_item(item, {"item_name": item, "stock_uom": "Nos", "is_stock_item": 1})
+
+		routing_doc = create_routing(routing_name="Testing Route", operations=operations)
+		bom_doc = setup_bom(
+			item_code=item_code,
+			routing=routing_doc.name,
+			raw_materials=[item_code + "RM 1", item_code + "RM 2"],
+			source_warehouse=warehouse,
+		)
+
+		for row in bom_doc.items:
+			make_stock_entry(item_code=row.item_code, target=row.source_warehouse, qty=qty, basic_rate=100)
+
+		return make_wo_order_test_record(
+			production_item=item_code,
+			bom_no=bom_doc.name,
+			qty=qty,
+			skip_transfer=1,
+			wip_warehouse=warehouse,
+			source_warehouse=warehouse,
+		)
+
+	def test_completion_qty_capped_by_previous_operation(self):
+		wo_doc = self.make_two_operation_work_order()
+		job_cards = frappe.get_all(
+			"Job Card",
+			filters={"work_order": wo_doc.name},
+			fields=["name", "sequence_id"],
+			order_by="sequence_id",
+		)
+
+		jc1 = frappe.get_doc("Job Card", job_cards[0].name)
+		self.assertIsNone(jc1.get_max_completable_qty())
+
+		jc1.append(
+			"time_logs",
+			{"from_time": now(), "to_time": add_to_date(now(), minutes=30), "completed_qty": 8},
+		)
+		jc1.save()
+		jc1.submit()
+		self.assertEqual(jc1.process_loss_qty, 2)
+
+		jc2 = frappe.get_doc("Job Card", job_cards[1].name)
+		self.assertEqual(jc2.get_max_completable_qty(), 8)
+
+		jc2.append("time_logs", {"from_time": add_to_date(now(), minutes=40)})
+		jc2.save()
+
+		self.assertRaises(
+			frappe.ValidationError,
+			jc2.complete_job_card,
+			qty=10,
+			for_quantity=10,
+			pending_qty=0,
+			process_loss_qty=0,
+			end_time=add_to_date(now(), minutes=70),
+		)
+
+		self.complete_second_operation_and_finish(wo_doc, jc2.name)
+
+	def complete_second_operation_and_finish(self, wo_doc, job_card):
+		from erpnext.manufacturing.doctype.work_order.work_order import (
+			make_stock_entry as make_stock_entry_for_wo,
+		)
+
+		jc2 = frappe.get_doc("Job Card", job_card)
+		jc2.time_logs[0].completed_qty = 7
+		jc2.time_logs[0].to_time = add_to_date(now(), minutes=70)
+		jc2.save()
+		self.assertEqual(jc2.process_loss_qty, 3)
+		jc2.submit()
+
+		se = frappe.get_doc(make_stock_entry_for_wo(wo_doc.name, "Manufacture", 10))
+		se.submit()
+
+		self.assertEqual(se.process_loss_qty, 3)
+		fg_qty = sum(d.qty for d in se.items if d.is_finished_item)
+		self.assertEqual(flt(fg_qty), 7)
+
+		wo_doc.reload()
+		self.assertEqual(wo_doc.produced_qty, 7)
+		self.assertEqual(wo_doc.process_loss_qty, 3)
+		self.assertEqual(wo_doc.status, "Completed")
+
+	def test_process_loss_booked_once_across_partial_entries(self):
+		from erpnext.manufacturing.doctype.work_order.work_order import (
+			make_stock_entry as make_stock_entry_for_wo,
+		)
+
+		wo_doc = self.make_two_operation_work_order()
+		job_cards = frappe.get_all(
+			"Job Card", filters={"work_order": wo_doc.name}, fields=["name"], order_by="sequence_id"
+		)
+
+		for index, row in enumerate(job_cards):
+			jc = frappe.get_doc("Job Card", row.name)
+			from_time = add_to_date(now(), minutes=index * 40)
+			jc.append(
+				"time_logs",
+				{"from_time": from_time, "to_time": add_to_date(from_time, minutes=30), "completed_qty": 7},
+			)
+			jc.save()
+			jc.submit()
+			self.assertEqual(jc.process_loss_qty, 3)
+
+		se1 = frappe.get_doc(make_stock_entry_for_wo(wo_doc.name, "Manufacture", 5))
+		se1.submit()
+		self.assertEqual(se1.process_loss_qty, 3)
+		self.assertEqual(flt(sum(d.qty for d in se1.items if d.is_finished_item)), 2)
+
+		se2 = frappe.get_doc(make_stock_entry_for_wo(wo_doc.name, "Manufacture", 5))
+		se2.submit()
+		self.assertEqual(flt(se2.process_loss_qty), 0)
+		self.assertEqual(flt(sum(d.qty for d in se2.items if d.is_finished_item)), 5)
+
+		wo_doc.reload()
+		self.assertEqual(wo_doc.process_loss_qty, 3)
+		self.assertEqual(wo_doc.produced_qty, 7)
 		self.assertEqual(wo_doc.status, "Completed")
 
 	def get_first_job_card(self, work_order):
@@ -1163,7 +1341,8 @@ class TestJobCard(ERPNextTestSuite):
 					"qty": 1,
 					"process_loss_per": 10,
 					"cost_allocation_per": 5,
-					"type": "Scrap",
+					"valuation_type": "% of FG Cost",
+					"secondary_item_type": "Scrap",
 				},
 			)
 			if submit:
@@ -1246,7 +1425,8 @@ class TestJobCard(ERPNextTestSuite):
 			},
 		)
 		job_card.append(
-			"secondary_items", {"item_code": scrap_extra.name, "stock_qty": 5, "type": "Co-Product"}
+			"secondary_items",
+			{"item_code": scrap_extra.name, "stock_qty": 5, "secondary_item_type": "Co-Product"},
 		)
 		job_card.submit()
 
@@ -1265,7 +1445,7 @@ class TestJobCard(ERPNextTestSuite):
 		self.assertEqual(manufacturing_entry.items[2].qty, 9)
 		self.assertEqual(flt(manufacturing_entry.items[2].basic_rate, 3), 5.556)
 		self.assertEqual(manufacturing_entry.items[3].item_code, scrap_extra.name)
-		self.assertEqual(manufacturing_entry.items[3].type, "Co-Product")
+		self.assertEqual(manufacturing_entry.items[3].secondary_item_type, "Co-Product")
 		self.assertEqual(manufacturing_entry.items[3].qty, 5)
 		self.assertEqual(manufacturing_entry.items[3].basic_rate, 0)
 
@@ -1681,16 +1861,16 @@ class TestJobCard(ERPNextTestSuite):
 		job_card.save()
 
 		job_card.complete_job_card(
-			qty=3,
+			qty=2,
 			for_quantity=5,
-			pending_qty=2,
+			pending_qty=3,
 			process_loss_qty=0,
 			end_time="2024-04-01 09:00:00",
 		)
 
 		job_card.reload()
 		self.assertEqual(flt(job_card.for_quantity), 5)
-		self.assertEqual(flt(job_card.pending_qty), 2)
+		self.assertEqual(flt(job_card.pending_qty), 3)
 		self.assertEqual(flt(job_card.process_loss_qty), 0)
 
 		job_card.submit()
@@ -1698,12 +1878,28 @@ class TestJobCard(ERPNextTestSuite):
 
 		manufacturing_entry = frappe.get_doc(job_card.make_stock_entry_for_semi_fg_item())
 		finished_item = next(row for row in manufacturing_entry.items if row.is_finished_item)
-		self.assertEqual(flt(finished_item.qty), 3)
+		self.assertEqual(flt(finished_item.qty), 2)
 		manufacturing_entry.submit()
 
 		job_card.reload()
-		self.assertEqual(flt(job_card.manufactured_qty), 3)
+		self.assertEqual(flt(job_card.manufactured_qty), 2)
 		self.assertEqual(job_card.status, "Completed")
+
+		make_job_card(
+			work_order.name,
+			[
+				{
+					"name": work_order.operations[0].name,
+					"operation": "Pending Qty Op A",
+					"qty": 3,
+					"pending_qty": 3,
+				}
+			],
+		)
+		follow_up_job_card = frappe.get_last_doc(
+			"Job Card", {"work_order": work_order.name, "operation_id": work_order.operations[0].name}
+		)
+		self.assertEqual(flt(follow_up_job_card.for_quantity), 3)
 
 	def test_semi_fg_sequence_needs_previous_operations_manufactured(self):
 		from erpnext.manufacturing.doctype.operation.test_operation import make_operation
@@ -2429,7 +2625,9 @@ class TestJobCard(ERPNextTestSuite):
 			)
 
 		job_card = frappe.get_last_doc("Job Card", {"work_order": self.work_order.name})
-		job_card.append("secondary_items", {"item_code": "_Test Item", "stock_qty": 2, "type": "Scrap"})
+		job_card.append(
+			"secondary_items", {"item_code": "_Test Item", "stock_qty": 2, "secondary_item_type": "Scrap"}
+		)
 		job_card.append(
 			"time_logs",
 			{
@@ -2450,6 +2648,98 @@ class TestJobCard(ERPNextTestSuite):
 
 		self.assertEqual(s.items[3].item_code, "_Test Item")
 		self.assertEqual(s.items[3].transfer_qty, 2)
+
+		frappe.db.set_value(
+			"Stock Entry Detail",
+			s.items[3].name,
+			{"secondary_item_type": None, "valuation_type": "Valuation Rate"},
+		)
+
+		stock_entry = frappe.get_doc({"doctype": "Stock Entry", "work_order": self.work_order.name})
+		used_secondary_items = stock_entry.get_used_secondary_items()
+		self.assertEqual(used_secondary_items[("_Test Item", "Scrap")], 2)
+
+	def test_secondary_items_from_multiple_boms_stay_separate(self):
+		"""Rows linked to different BOM rows keep their own quantity and valuation mode."""
+		from erpnext.stock.doctype.item.test_item import make_item
+
+		secondary_item = make_item(properties={"is_stock_item": 1, "valuation_rate": 50}).name
+
+		bom_links = []
+		for cost_allocation_per in (0, 10):
+			fg_item = make_item(properties={"is_stock_item": 1}).name
+			rm_item = make_item(properties={"is_stock_item": 1, "valuation_rate": 100}).name
+
+			bom_doc = frappe.new_doc("BOM")
+			bom_doc.item = fg_item
+			bom_doc.quantity = 1
+			bom_doc.company = "_Test Company"
+			bom_doc.currency = "INR"
+			bom_doc.append("items", {"item_code": rm_item, "qty": 1, "rate": 100.0})
+			bom_doc.append(
+				"secondary_items",
+				{
+					"item_code": secondary_item,
+					"secondary_item_type": "Scrap",
+					"qty": 1,
+					"cost_allocation_per": cost_allocation_per,
+					"valuation_type": "% of FG Cost" if cost_allocation_per else "Valuation Rate",
+				},
+			)
+			bom_doc.save()
+			bom_doc.submit()
+			bom_links.append(bom_doc.secondary_items[0].name)
+
+		for row in frappe.get_doc("BOM", self.work_order.bom_no).items:
+			make_stock_entry(
+				item_code=row.item_code,
+				target="_Test Warehouse - _TC",
+				qty=10,
+				basic_rate=100,
+			)
+
+		job_card = frappe.get_last_doc("Job Card", {"work_order": self.work_order.name})
+		job_card.append(
+			"secondary_items",
+			{
+				"item_code": secondary_item,
+				"stock_qty": 2,
+				"secondary_item_type": "Scrap",
+				"bom_secondary_item": bom_links[0],
+			},
+		)
+		job_card.append(
+			"secondary_items",
+			{
+				"item_code": secondary_item,
+				"stock_qty": 3,
+				"secondary_item_type": "Scrap",
+				"bom_secondary_item": bom_links[1],
+			},
+		)
+		job_card.append(
+			"time_logs",
+			{
+				"from_time": "2009-01-01 12:06:25",
+				"to_time": "2009-01-01 12:37:25",
+				"completed_qty": job_card.for_quantity,
+			},
+		)
+		job_card.save()
+		job_card.submit()
+
+		from erpnext.manufacturing.doctype.work_order.work_order import (
+			make_stock_entry as make_stock_entry_for_wo,
+		)
+
+		s = frappe.get_doc(make_stock_entry_for_wo(self.work_order.name, "Manufacture"))
+
+		rows = {d.bom_secondary_item: d for d in s.items if d.item_code == secondary_item}
+		self.assertEqual(len(rows), 2)
+		self.assertEqual(rows[bom_links[0]].qty, 2)
+		self.assertEqual(rows[bom_links[0]].valuation_type, "Valuation Rate")
+		self.assertEqual(rows[bom_links[1]].qty, 3)
+		self.assertEqual(rows[bom_links[1]].valuation_type, "% of FG Cost")
 
 	@ERPNextTestSuite.change_settings(
 		"Manufacturing Settings", {"overproduction_percentage_for_work_order": 100}

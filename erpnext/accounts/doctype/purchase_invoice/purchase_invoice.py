@@ -42,6 +42,7 @@ from erpnext.assets.doctype.asset.asset import is_cwip_accounting_enabled
 from erpnext.assets.doctype.asset_category.asset_category import get_asset_category_account
 from erpnext.controllers.accounts_controller import merge_taxes, validate_account_head
 from erpnext.controllers.buying_controller import BuyingController
+from erpnext.controllers.mapper import get_qty_already_mapped
 from erpnext.stock.doctype.purchase_receipt.purchase_receipt import (
 	update_billed_amount_based_on_po,
 )
@@ -286,9 +287,7 @@ class PurchaseInvoice(BuyingController):
 		self.check_conversion_rate()
 		self.validate_credit_to_acc()
 		self.clear_unallocated_advances("Purchase Invoice Advance", "advances")
-		self.check_for_on_hold_or_closed_status(
-			"Purchase Order", "purchase_order", exclude_if_field="purchase_receipt"
-		)
+		self.check_purchase_order_on_hold_or_close("purchase_order", exclude_if_field="purchase_receipt")
 		self.validate_with_previous_doc()
 		self.validate_uom_is_integer("uom", "qty")
 		self.validate_uom_is_integer("stock_uom", "stock_qty")
@@ -300,6 +299,7 @@ class PurchaseInvoice(BuyingController):
 		self.validate_multiple_billing("Purchase Receipt", "pr_detail", "amount")
 		self.set_status()
 		self.validate_purchase_receipt_if_update_stock()
+		self.validate_exchange_rate_with_purchase_receipt()
 		validate_inter_company_party(
 			self.doctype, self.supplier, self.company, self.inter_company_invoice_reference
 		)
@@ -322,6 +322,47 @@ class PurchaseInvoice(BuyingController):
 
 		if total_billed_qty and total_received_qty:
 			self.per_received = total_received_qty / total_billed_qty * 100
+
+	def validate_exchange_rate_with_purchase_receipt(self):
+		if self.is_internal_transfer() or not erpnext.is_perpetual_inventory_enabled(self.company):
+			return
+
+		stock_items = self.get_stock_items()
+		receipts = {
+			item.purchase_receipt
+			for item in self.items
+			if item.purchase_receipt and item.item_code in stock_items
+		}
+		if not receipts:
+			return
+
+		if frappe.db.get_single_value("Buying Settings", "set_landed_cost_based_on_purchase_invoice_rate"):
+			return
+
+		mismatched = [
+			f"{frappe.bold(row.name)} ({row.conversion_rate})"
+			for row in frappe.get_all(
+				"Purchase Receipt",
+				filters={"name": ("in", list(receipts))},
+				fields=["name", "currency", "conversion_rate"],
+			)
+			if row.currency == self.currency
+			and flt(row.conversion_rate)
+			and flt(row.conversion_rate) != flt(self.conversion_rate)
+		]
+		if not mismatched:
+			return
+
+		frappe.throw(
+			_(
+				"Exchange rate {0} does not match the exchange rate of Purchase Receipt {1}. Use the same exchange rate as the Purchase Receipt or enable {2} in {3} to adjust the landed cost based on this invoice."
+			).format(
+				frappe.bold(self.conversion_rate),
+				", ".join(mismatched),
+				frappe.bold(_("Set Landed Cost Based on Purchase Invoice Rate")),
+				get_link_to_form("Buying Settings", "Buying Settings", _("Buying Settings")),
+			)
+		)
 
 	def validate_invoice_hold(self):
 		if self.is_return:
@@ -1752,9 +1793,7 @@ class PurchaseInvoice(BuyingController):
 		super().on_cancel()
 		PurchaseTaxWithholding(self).on_cancel()
 
-		self.check_for_on_hold_or_closed_status(
-			"Purchase Order", "purchase_order", exclude_if_field="purchase_receipt"
-		)
+		self.check_purchase_order_on_hold_or_close("purchase_order", exclude_if_field="purchase_receipt")
 
 		if self.is_return and not self.update_billed_amount_in_purchase_order:
 			# NOTE status updating bypassed for is_return
@@ -2081,6 +2120,11 @@ def make_purchase_receipt(source_name, target_doc=None, args=None):
 	if isinstance(args, str):
 		args = json.loads(args)
 
+	mapped_qty_by_item = get_qty_already_mapped(target_doc, "purchase_invoice_item")
+
+	def received_and_mapped_qty(obj):
+		return flt(obj.received_qty) + flt(mapped_qty_by_item.get(obj.name, 0))
+
 	def post_parent_process(source_parent, target_parent):
 		remove_items_with_zero_qty(target_parent)
 		set_missing_values(source_parent, target_parent)
@@ -2104,15 +2148,13 @@ def make_purchase_receipt(source_name, target_doc=None, args=None):
 			or {}
 		)
 
-		target.qty = flt(obj.qty) - flt(obj.received_qty) - flt(returned_qty_map.get("qty"))
-		target.received_qty = flt(obj.qty) - flt(obj.received_qty)
-		target.stock_qty = (flt(obj.qty) - flt(obj.received_qty) - flt(returned_qty_map.get("qty"))) * flt(
-			obj.conversion_factor
-		)
-		target.amount = (flt(obj.qty) - flt(obj.received_qty)) * flt(obj.rate)
-		target.base_amount = (
-			(flt(obj.qty) - flt(obj.received_qty)) * flt(obj.rate) * flt(source_parent.conversion_rate)
-		)
+		pending_qty = flt(obj.qty) - received_and_mapped_qty(obj)
+
+		target.qty = pending_qty - flt(returned_qty_map.get("qty"))
+		target.received_qty = pending_qty
+		target.stock_qty = (pending_qty - flt(returned_qty_map.get("qty"))) * flt(obj.conversion_factor)
+		target.amount = pending_qty * flt(obj.rate)
+		target.base_amount = pending_qty * flt(obj.rate) * flt(source_parent.conversion_rate)
 
 	def select_item(d):
 		filtered_items = args.get("filtered_children", [])
@@ -2142,7 +2184,9 @@ def make_purchase_receipt(source_name, target_doc=None, args=None):
 					"wip_composite_asset": "wip_composite_asset",
 				},
 				"postprocess": update_item,
-				"condition": lambda doc: abs(doc.received_qty) < abs(doc.qty) and select_item(doc),
+				"condition": lambda doc: (
+					abs(received_and_mapped_qty(doc)) < abs(doc.qty) and select_item(doc)
+				),
 			},
 			"Purchase Taxes and Charges": {
 				"doctype": "Purchase Taxes and Charges",

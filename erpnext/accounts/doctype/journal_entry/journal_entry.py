@@ -1402,6 +1402,7 @@ def get_payment_entry_against_order(
 	dt, dn, amount=None, debit_in_account_currency=None, journal_entry=False, bank_account=None
 ):
 	ref_doc = frappe.get_doc(dt, dn)
+	ref_doc.check_permission()
 
 	if flt(ref_doc.per_billed, 2) > 0:
 		frappe.throw(_("Can only make payment against unbilled {0}").format(dt))
@@ -1447,6 +1448,8 @@ def get_payment_entry_against_invoice(
 	dt, dn, amount=None, debit_in_account_currency=None, journal_entry=False, bank_account=None
 ):
 	ref_doc = frappe.get_doc(dt, dn)
+	ref_doc.check_permission()
+
 	if dt == "Sales Invoice":
 		party_type = "Customer"
 		party_account = get_party_account_based_on_invoice_discounting(dn) or ref_doc.debit_to
@@ -1482,6 +1485,8 @@ def get_payment_entry_against_invoice(
 
 
 def get_payment_entry(ref_doc, args):
+	frappe.has_permission("Journal Entry", ptype="create", throw=True)
+
 	cost_center = ref_doc.get("cost_center") or frappe.get_cached_value(
 		"Company", ref_doc.company, "cost_center"
 	)
@@ -1777,6 +1782,20 @@ def make_inter_company_journal_entry(name, voucher_type, company):
 
 @frappe.whitelist()
 def make_reverse_journal_entry(source_name, target_doc=None):
+	# `get_mapped_doc` checks this as well, but the guards below disclose which entry
+	# reverses which, so read access has to be settled before they run
+	if not frappe.has_permission("Journal Entry", doc=source_name):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+	reversal_of = frappe.db.get_value("Journal Entry", source_name, "reversal_of")
+	if reversal_of:
+		frappe.throw(
+			_("{0} is already a Reverse Journal Entry of {1}. Cancel it instead of reversing it.").format(
+				get_link_to_form("Journal Entry", source_name),
+				get_link_to_form("Journal Entry", reversal_of),
+			)
+		)
+
 	existing_reverse = frappe.db.exists("Journal Entry", {"reversal_of": source_name, "docstatus": 1})
 	if existing_reverse:
 		frappe.throw(
