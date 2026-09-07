@@ -4998,7 +4998,7 @@ msgstr "佣金基数"
 #. Template'
 #: erpnext/accounts/doctype/cheque_print_template/cheque_print_template.json
 msgid "Amount In Figure"
-msgstr "量图"
+msgstr "小写金额"
 
 #. Option for the 'Detected Amount Format' (Select) field in DocType 'Bank
 #. Statement Import Log'
@@ -9941,7 +9941,7 @@ msgstr "无法为{1}生产超过{0}件物料"
 
 #: erpnext/accounts/doctype/payment_entry/payment_entry.py:361
 msgid "Cannot receive from customer against negative outstanding"
-msgstr "存在负未清金额时不可从客户收货"
+msgstr "客户未清金额为负数时，不能从该客户收款"
 
 #: erpnext/controllers/accounts_controller.py:4020
 msgid "Cannot reduce quantity than ordered or purchased quantity"
@@ -30902,7 +30902,7 @@ msgstr "请在物料主数据中维护成本价"
 #: erpnext/setup/doctype/customer_group/customer_group.json
 #: erpnext/setup/doctype/supplier_group/supplier_group.json
 msgid "Mention if non-standard receivable account applicable"
-msgstr "适用于公司需使用非标准应付科目的情况"
+msgstr "如适用，请指定非默认应收科目"
 
 #: erpnext/accounts/doctype/account/account.js:169
 msgid "Merge"
@@ -35234,7 +35234,7 @@ msgstr "付款金额（本币）"
 #. Entry'
 #: erpnext/accounts/doctype/payment_entry/payment_entry.json
 msgid "Paid Amount After Tax"
-msgstr "税后付款金额(本币)"
+msgstr "税后付款金额"
 
 #. Label of the base_paid_amount_after_tax (Currency) field in DocType 'Payment
 #. Entry'
@@ -35991,7 +35991,7 @@ msgstr "必须填写往来方"
 
 #: erpnext/accounts/doctype/bank_transaction_rule/bank_transaction_rule.py:111
 msgid "Party is required create a payment entry."
-msgstr "交易方需要创建付款凭证。"
+msgstr "创建收付款凭证时必须指定往来方。"
 
 #: erpnext/accounts/doctype/bank_transaction_rule/bank_transaction_rule.py:108
 msgid "Party type is required to create a payment entry."
@@ -42499,7 +42499,7 @@ msgstr "询价和采购订单设置"
 
 #: erpnext/buying/doctype/request_for_quotation/request_for_quotation.py:133
 msgid "RFQs are not allowed for {0} due to a scorecard standing of {1}"
-msgstr "由于评分卡的当前评级为{1}，使用向{0}询价"
+msgstr "由于评分卡当前评级为 {1}，不允许向 {0} 询价。"
 
 #. Label of the auto_indent (Check) field in DocType 'Stock Settings'
 #: erpnext/stock/doctype/stock_settings/stock_settings.json
@@ -42721,7 +42721,7 @@ msgstr "单价及小计"
 #: erpnext/accounts/doctype/pos_invoice/pos_invoice.json
 #: erpnext/accounts/doctype/sales_invoice/sales_invoice.json
 msgid "Rate at which Customer Currency is converted to customer's base currency"
-msgstr "客户货币转换为客户货币后的单价"
+msgstr "将客户货币换算为客户本币的汇率"
 
 #. Description of the 'Price List Exchange Rate' (Float) field in DocType
 #. 'Quotation'
@@ -42731,7 +42731,7 @@ msgstr "客户货币转换为客户货币后的单价"
 #: erpnext/selling/doctype/sales_order/sales_order.json
 #: erpnext/stock/doctype/delivery_note/delivery_note.json
 msgid "Rate at which Price list currency is converted to company's base currency"
-msgstr "价格表货币转换为公司本币后的单价"
+msgstr "将价格表货币换算为公司本币的汇率"
 
 #. Description of the 'Price List Exchange Rate' (Float) field in DocType 'POS
 #. Invoice'
@@ -42740,7 +42740,7 @@ msgstr "价格表货币转换为公司本币后的单价"
 #: erpnext/accounts/doctype/pos_invoice/pos_invoice.json
 #: erpnext/accounts/doctype/sales_invoice/sales_invoice.json
 msgid "Rate at which Price list currency is converted to customer's base currency"
-msgstr "价格表货币转换成客户货币后的单价"
+msgstr "将价格表货币换算为客户本币的汇率"
 
 #. Description of the 'Exchange Rate' (Float) field in DocType 'Quotation'
 #. Description of the 'Exchange Rate' (Float) field in DocType 'Sales Order'
@@ -42749,13 +42749,13 @@ msgstr "价格表货币转换成客户货币后的单价"
 #: erpnext/selling/doctype/sales_order/sales_order.json
 #: erpnext/stock/doctype/delivery_note/delivery_note.json
 msgid "Rate at which customer's currency is converted to company's base currency"
-msgstr "客户的货币转换为公司的本币后的单价"
+msgstr "将客户货币换算为公司本币的汇率"
 
 #. Description of the 'Exchange Rate' (Float) field in DocType 'Purchase
 #. Receipt'
 #: erpnext/stock/doctype/purchase_receipt/purchase_receipt.json
 msgid "Rate at which supplier's currency is converted to company's base currency"
-msgstr "供应商的货币转换为公司的本币后的单价"
+msgstr "将供应商货币换算为公司本币的汇率"
 
 #. Description of the 'Tax Rate' (Float) field in DocType 'Account'
 #: erpnext/accounts/doctype/account/account.json
@@ -52308,7 +52308,7 @@ msgstr "早于{0}的库存事务已冻结"
 
 #: erpnext/stock/stock_ledger.py:74
 msgid "Stock transactions dated on or before {0} are frozen because the period is closed and the Stock Closing Entry {1} has been generated. To make changes, cancel the Period Closing Voucher first."
-msgstr "日期为 {0} 或之前的库存交易被冻结，因为该期间已结束并且已生成股票结账分录 {1}。如需更改，请先取消期末凭证。"
+msgstr "日期为 {0} 或之前的库存交易已冻结，因为该会计期间已关闭，且已生成库存结转分录 {1}。如需更改，请先取消期末凭证。"
 
 #. Description of the 'Freeze stocks older than (days)' (Int) field in DocType
 #. 'Stock Settings'
@@ -54977,7 +54977,7 @@ msgstr "批次{0}在{2}仓库中为{1}预留，剩余数量不足以满足预留
 
 #: erpnext/accounts/doctype/period_closing_voucher/period_closing_voucher.py:179
 msgid "The closing balance {0} of the Stock Asset accounts does not match the closing value {1} of the Stock Balance report as on {2}. Resolve the difference using the Stock Ledger Variance report before closing the period."
-msgstr "库存资产账户的期末余额 {0} 与 {2} 的股票余额报告的期末值 {1} 不符。在结账期间之前使用库存总账差异报告解决差异。"
+msgstr "库存资产科目的期末余额 {0} 与截至 {2} 的库存余额报表期末值 {1} 不符。请在结账前使用库存台账差异报表解决差异。"
 
 #: erpnext/regional/report/vat_audit_report/vat_audit_report.py:43
 msgid "The company {0} is not in South Africa. VAT Audit Report is only available for companies in South Africa."
