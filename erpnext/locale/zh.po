@@ -1592,9 +1592,8 @@ msgstr "账户信息"
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_template.js:291
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:36
-#, fuzzy
 msgid "Account Filter"
-msgstr "会计账金额"
+msgstr ""
 
 #. Label of the account_head (Link) field in DocType 'Advance Taxes and
 #. Charges'
@@ -2356,9 +2355,8 @@ msgstr "应收账款"
 #. Label of the accounts_receivable_payable_tuning_section (Section Break)
 #. field in DocType 'Accounts Settings'
 #: erpnext/accounts/doctype/accounts_settings/accounts_settings.json
-#, fuzzy
 msgid "Accounts Receivable / Payable Report"
-msgstr "应收/应付报表性能优化"
+msgstr ""
 
 #. Label of the receivable_payable_remarks_length (Int) field in DocType
 #. 'Accounts Settings'
@@ -2845,9 +2843,8 @@ msgid "Actual Time in Hours (via Timesheet)"
 msgstr "实际工时（通过工时表）"
 
 #: erpnext/manufacturing/doctype/work_order/work_order.js:1129
-#, fuzzy
 msgid "Actual quantity of the finished good that will be manufactured."
-msgstr "输入基于此物料清单生产的物料数量"
+msgstr ""
 
 #: erpnext/accounts/doctype/payment_entry/payment_entry.js:1538
 #: erpnext/public/js/controllers/accounts.js:194
@@ -6457,7 +6454,7 @@ msgstr "执行人姓名"
 
 #: erpnext/templates/pages/projects.html:48
 msgid "Assignment"
-msgstr "分配任务"
+msgstr "作业"
 
 #. Label of the filters_section (Section Break) field in DocType 'Service Level
 #. Agreement'
@@ -8916,9 +8913,8 @@ msgstr "临时冻结供应商"
 
 #. Description of the 'Is Frozen' (Check) field in DocType 'Customer'
 #: erpnext/selling/doctype/customer/customer.json
-#, fuzzy
 msgid "Blocks new transactions and further accounting entries on this customer's account. Only users with the role set in Company's \"Roles Allowed to Set and Edit Frozen Account Entries\" can transact."
-msgstr "阻止该客户账户上的所有进一步会计分录。只有具有冻结条目角色的用户才能覆盖。\n"
+msgstr ""
 
 #. Description of the 'Disabled' (Check) field in DocType 'Customer'
 #: erpnext/selling/doctype/customer/customer.json
@@ -8938,9 +8934,8 @@ msgstr "血型"
 #. Label of the body (Text Editor) field in DocType 'Process Statement Of
 #. Accounts'
 #: erpnext/accounts/doctype/process_statement_of_accounts/process_statement_of_accounts.json
-#, fuzzy
 msgid "Body"
-msgstr "正文文本"
+msgstr "正文"
 
 #. Label of the body_text (Text Editor) field in DocType 'Dunning'
 #. Label of the body_text (Text Editor) field in DocType 'Dunning Letter Text'
@@ -9598,9 +9593,8 @@ msgstr "计算折扣不匹配"
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_template.js:298
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:39
-#, fuzzy
 msgid "Calculation Formula"
-msgstr "计算"
+msgstr ""
 
 #. Label of the section_break_11 (Section Break) field in DocType 'Supplier
 #. Scorecard Period'
@@ -12201,9 +12195,8 @@ msgid "Completed Quantity ({0}), Pending Quantity ({1}) and Process Loss Quantit
 msgstr ""
 
 #: erpnext/manufacturing/doctype/job_card/job_card.js:282
-#, fuzzy
 msgid "Completed Quantity cannot be greater than {0}"
-msgstr "待处理数量不能大于{0}"
+msgstr ""
 
 #: erpnext/projects/report/project_summary/project_summary.py:136
 #: erpnext/public/js/templates/crm_activities.html:64
@@ -13528,9 +13521,8 @@ msgid "Could not update the header row."
 msgstr "无法更新标题行。"
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:545
-#, fuzzy
 msgid "Could not validate {0}: {1}"
-msgstr "无效的{0}：{1}"
+msgstr ""
 
 #. Name of a UOM
 #: erpnext/setup/setup_wizard/data/uom_data.json
@@ -15765,9 +15757,8 @@ msgid "Dear"
 msgstr "尊敬的"
 
 #: erpnext/stock/reorder_item.py:382
-#, fuzzy
 msgid "Dear System Manager,"
-msgstr "物料主数据管理员"
+msgstr "尊敬的系统管理员："
 
 #. Option for the 'Balance must be' (Select) field in DocType 'Account'
 #. Label of the debit (Data) field in DocType 'Bank Transaction Rule Accounts'
@@ -17530,9 +17521,8 @@ msgstr "时间表不允许直接返回。"
 #. Label of the disable_include_dimensions (Check) field in DocType 'Accounts
 #. Settings'
 #: erpnext/accounts/doctype/accounts_settings/accounts_settings.json
-#, fuzzy
 msgid "Disable \"Consider Accounting Dimension\" Filter"
-msgstr "显示辅助核算"
+msgstr ""
 
 #. Label of the disable_capacity_planning (Check) field in DocType
 #. 'Manufacturing Settings'
@@ -18590,9 +18580,8 @@ msgid "Duplicate POS Invoices found"
 msgstr "发现重复POS发票"
 
 #: erpnext/accounts/doctype/pos_settings/pos_settings.py:128
-#, fuzzy
 msgid "Duplicate POS Search Fields"
-msgstr "重复POS字段"
+msgstr ""
 
 #: erpnext/accounts/doctype/payment_request/payment_request.py:134
 msgid "Duplicate Payment Schedule selected"
@@ -18635,9 +18624,8 @@ msgid "Duplicate languages found on Dunning Letter Text. Keep only one of them."
 msgstr "催款信文本中发现重复的语言。只保留其中之一。"
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:170
-#, fuzzy
 msgid "Duplicate line reference: '{0}'"
-msgstr "重复条目：{0}{1}"
+msgstr ""
 
 #: erpnext/projects/doctype/project/project.js:186
 msgid "Duplicate project has been created"
@@ -20805,9 +20793,8 @@ msgid "Fetching..."
 msgstr "获取中..."
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:461
-#, fuzzy
 msgid "Field '{0}' is not a valid Account field"
-msgstr "{0} 不是有效的会计维度。"
+msgstr ""
 
 #: erpnext/setup/doctype/transaction_deletion_record/transaction_deletion_record.py:224
 msgid "Field '{0}' is not a valid Company link field for DocType {1}"
@@ -20897,9 +20884,8 @@ msgid "Filter must be [field, operator, value]"
 msgstr ""
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:488
-#, fuzzy
 msgid "Filter must be a list or dict"
-msgstr "必须设置驾驶员才能提交"
+msgstr ""
 
 #. Label of the invoice_name (Data) field in DocType 'Payment Reconciliation'
 #: erpnext/accounts/doctype/payment_reconciliation/payment_reconciliation.json
@@ -22489,9 +22475,8 @@ msgstr "会计总账"
 #. Label of the remarks_section (Section Break) field in DocType 'Accounts
 #. Settings'
 #: erpnext/accounts/doctype/accounts_settings/accounts_settings.json
-#, fuzzy
 msgid "General Ledger Report"
-msgstr "会计总账"
+msgstr ""
 
 #. Label of the general_ledger_remarks_length (Int) field in DocType 'Accounts
 #. Settings'
@@ -24908,9 +24893,8 @@ msgid "Include Default FB Entries"
 msgstr "包括默认账簿分录"
 
 #: erpnext/stock/report/stock_ledger_variance/stock_ledger_variance.js:71
-#, fuzzy
 msgid "Include Disabled"
-msgstr "包括已过期"
+msgstr "包含已禁用"
 
 #: erpnext/buying/report/supplier_quotation_comparison/supplier_quotation_comparison.js:101
 msgid "Include Expired"
@@ -25188,9 +25172,8 @@ msgid "Incorrect Date"
 msgstr "日期错误"
 
 #: erpnext/stock/doctype/stock_ledger_entry/stock_ledger_entry.py:216
-#, fuzzy
 msgid "Incorrect Inventory Dimension"
-msgstr "库存辅助核算"
+msgstr ""
 
 #: erpnext/stock/doctype/landed_cost_voucher/landed_cost_voucher.py:158
 msgid "Incorrect Invoice"
@@ -25665,9 +25648,8 @@ msgid "Internal Customer Accounting"
 msgstr "内部客户会计"
 
 #: erpnext/selling/doctype/customer/customer.py:272
-#, fuzzy
 msgid "Internal Customer Already Exists"
-msgstr "公司{0}的内部客户已存在"
+msgstr ""
 
 #: erpnext/selling/doctype/customer/customer.py:266
 msgid "Internal Customer {0} already exists for {1}. Disable it to make this Customer internal."
@@ -25690,9 +25672,8 @@ msgid "Internal Sales Reference Missing"
 msgstr "关联方内部销售订单号必填"
 
 #: erpnext/buying/doctype/supplier/supplier.py:193
-#, fuzzy
 msgid "Internal Supplier Already Exists"
-msgstr "内部供应商详细信息"
+msgstr ""
 
 #. Label of the internal_supplier_section (Section Break) field in DocType
 #. 'Supplier'
@@ -25890,9 +25871,8 @@ msgid "Invalid Item Defaults"
 msgstr "无效物料默认值"
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:434
-#, fuzzy
 msgid "Invalid JSON format: {0}"
-msgstr "借方/贷方公式无效：{0}"
+msgstr ""
 
 #. Name of a report
 #: erpnext/accounts/report/invalid_ledger_entries/invalid_ledger_entries.json
@@ -25909,14 +25889,12 @@ msgid "Invalid Opening Entry"
 msgstr "无效的期初分录"
 
 #: erpnext/accounts/doctype/pos_settings/pos_settings.py:111
-#, fuzzy
 msgid "Invalid POS Field"
-msgstr "无效的POS发票"
+msgstr ""
 
 #: erpnext/accounts/doctype/pos_settings/pos_settings.js:55
-#, fuzzy
 msgid "Invalid POS Fields"
-msgstr "无效的POS发票"
+msgstr ""
 
 #: erpnext/accounts/doctype/pos_closing_entry/pos_closing_entry.py:142
 msgid "Invalid POS Invoices"
@@ -25924,9 +25902,8 @@ msgstr "无效的POS发票"
 
 #: erpnext/accounts/doctype/pos_settings/pos_settings.py:140
 #: erpnext/accounts/doctype/pos_settings/pos_settings.py:148
-#, fuzzy
 msgid "Invalid POS Search Field"
-msgstr "POS机搜索字段"
+msgstr ""
 
 #: erpnext/accounts/doctype/account/account.py:418
 msgid "Invalid Parent Account"
@@ -26058,9 +26035,8 @@ msgid "Invalid naming series (. missing) for {0}"
 msgstr "编号规则无效（缺少.）于{0}"
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:464
-#, fuzzy
 msgid "Invalid operator '{0}'"
-msgstr "无效的{0}"
+msgstr ""
 
 #: erpnext/accounts/doctype/payment_request/payment_request.py:587
 msgid "Invalid parameter. 'dn' should be of type str"
@@ -29478,9 +29454,8 @@ msgid "Line Reference"
 msgstr "线路参考"
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:296
-#, fuzzy
 msgid "Line references undefined in {0}: {1}"
-msgstr "无效的参考{0} {1}"
+msgstr ""
 
 #. Label of the amt_in_words_line_spacing (Float) field in DocType 'Cheque
 #. Print Template'
@@ -33522,9 +33497,8 @@ msgid "Nothing more to show."
 msgstr "没有更多内容。"
 
 #: erpnext/manufacturing/report/material_requirements_planning_report/material_requirements_planning_report.py:1336
-#, fuzzy
 msgid "Nothing to order from the selected rows"
-msgstr "过账日期与所选交易不匹配"
+msgstr ""
 
 #: erpnext/manufacturing/report/material_requirements_planning_report/material_requirements_planning_report.py:1334
 msgid "Nothing to order, the selected rows are already covered by stock or existing orders"
@@ -39129,9 +39103,8 @@ msgid "Please set a default Holiday List for Employee {0} or Company {1}"
 msgstr "请为员工{0}或公司{1}设置默认假期表"
 
 #: erpnext/crm/doctype/email_campaign/email_campaign.py:70
-#, fuzzy
 msgid "Please set a primary email ID for the Contact {0}"
-msgstr "请为线索{0}设置电子邮件"
+msgstr ""
 
 #: erpnext/accounts/doctype/purchase_invoice/purchase_invoice.py:1197
 msgid "Please set account in Warehouse {0}"
@@ -40081,9 +40054,8 @@ msgid "Price List {0} is disabled or does not exist"
 msgstr "价格表{0}已禁用或不存在"
 
 #: erpnext/manufacturing/doctype/blanket_order/blanket_order_pricing.py:72
-#, fuzzy
 msgid "Price List {0} is not enabled for {1}"
-msgstr "{0}未在{1}中启用"
+msgstr ""
 
 #. Label of the price_not_uom_dependent (Check) field in DocType 'Price List'
 #: erpnext/stock/doctype/price_list/price_list.json
@@ -40271,9 +40243,8 @@ msgstr "定价规则进一步基于数量进行筛选"
 #. Label of the primary_address (Text Editor) field in DocType 'Customer'
 #: erpnext/buying/doctype/supplier/supplier.json
 #: erpnext/selling/doctype/customer/customer.json
-#, fuzzy
 msgid "Primary Address"
-msgstr "首选地址信息"
+msgstr "主要地址"
 
 #: erpnext/public/js/utils/contact_address_quick_entry.js:73
 msgid "Primary Address Details"
@@ -40298,9 +40269,8 @@ msgstr "首选地址和联系人信息"
 #. 'Opportunity'
 #: erpnext/buying/doctype/supplier/supplier.json
 #: erpnext/crm/doctype/opportunity/opportunity.json
-#, fuzzy
 msgid "Primary Contact"
-msgstr "主要联系人电子邮件"
+msgstr "主要联系人"
 
 #: erpnext/public/js/utils/contact_address_quick_entry.js:41
 msgid "Primary Contact Details"
@@ -40537,9 +40507,8 @@ msgid "Process Loss Quantity"
 msgstr "加工损耗量"
 
 #: erpnext/manufacturing/doctype/job_card/job_card.js:341
-#, fuzzy
 msgid "Process Loss Quantity cannot be greater than {0}"
-msgstr "待处理数量不能大于{0}"
+msgstr ""
 
 #. Name of a report
 #: erpnext/manufacturing/report/process_loss_report/process_loss_report.json
@@ -42377,9 +42346,8 @@ msgid "Qty to Fetch"
 msgstr "待获取数量"
 
 #: erpnext/manufacturing/doctype/job_card/job_card.js:251
-#, fuzzy
 msgid "Qty to Manufacture in this Cycle"
-msgstr "生产数量"
+msgstr ""
 
 #. Label of the qty (Float) field in DocType 'Production Plan Sub Assembly
 #. Item'
@@ -43365,9 +43333,8 @@ msgstr "将客户货币换算为客户本币的汇率"
 #. Description of the 'Price List Exchange Rate' (Float) field in DocType
 #. 'Blanket Order'
 #: erpnext/manufacturing/doctype/blanket_order/blanket_order.json
-#, fuzzy
 msgid "Rate at which Price List Currency is converted to Company Currency"
-msgstr "将价格表货币换算为公司本币的汇率"
+msgstr ""
 
 #. Description of the 'Price List Exchange Rate' (Float) field in DocType
 #. 'Quotation'
@@ -43401,9 +43368,8 @@ msgstr "将客户货币换算为公司本币的汇率"
 
 #. Description of the 'Exchange Rate' (Float) field in DocType 'Blanket Order'
 #: erpnext/manufacturing/doctype/blanket_order/blanket_order.json
-#, fuzzy
 msgid "Rate at which document currency is converted to company currency"
-msgstr "将客户货币换算为公司本币的汇率"
+msgstr ""
 
 #. Description of the 'Exchange Rate' (Float) field in DocType 'Purchase
 #. Receipt'
@@ -46482,19 +46448,16 @@ msgid "Row #{0}: % of FG Cost needs a BOM secondary item. Choose Valuation Rate 
 msgstr ""
 
 #: erpnext/accounts/doctype/pos_settings/pos_settings.py:141
-#, fuzzy
 msgid "Row #{0}: '{1}' cannot be used to search items."
-msgstr "行＃{0}：{1}不能为负值对项{2}"
+msgstr ""
 
 #: erpnext/accounts/doctype/pos_settings/pos_settings.py:149
-#, fuzzy
 msgid "Row #{0}: '{1}' does not match {2}."
-msgstr "行{0}：{1} {2}不相匹配{3}"
+msgstr ""
 
 #: erpnext/accounts/doctype/pos_settings/pos_settings.py:112
-#, fuzzy
 msgid "Row #{0}: '{1}' is not a valid field of {2}."
-msgstr "行号#{0}：物料{1}非服务项"
+msgstr ""
 
 #: erpnext/stock/doctype/item/item.py:565
 msgid "Row #{0}: A reorder entry already exists for warehouse {1} with reorder type {2}."
@@ -46798,9 +46761,8 @@ msgid "Row #{0}: Item {1} in warehouse {2}: Available {3}, Needed {4}."
 msgstr "行#{0}：仓库{2}中的物品{1}：可用{3}，需要{4}。"
 
 #: erpnext/manufacturing/doctype/bom/bom.py:371
-#, fuzzy
 msgid "Row #{0}: Item {1} is already added with the same Type in the Secondary Items table."
-msgstr "行 #{0}：成品物料 {1} 无法添加到次要物料表中。"
+msgstr ""
 
 #: erpnext/controllers/subcontracting_inward_controller.py:65
 msgid "Row #{0}: Item {1} is not a Customer Provided Item."
@@ -47119,9 +47081,8 @@ msgid "Row #{0}: The batch {1} has already expired."
 msgstr "第{0}行:批号 {1} 已过期"
 
 #: erpnext/manufacturing/doctype/bom/bom.py:342
-#, fuzzy
 msgid "Row #{0}: The operation {1} has 'Is Final Finished Good' checked, so its FG / Semi FG Item must be {2}."
-msgstr "当启用“跟踪半成品”时，只有一项工序可以检查“是否为最终成品”。"
+msgstr ""
 
 #: erpnext/stock/doctype/item/item.py:581
 msgid "Row #{0}: The warehouse {1} is not a child warehouse of a group warehouse {2}"
@@ -47628,10 +47589,9 @@ msgid "Row {0}: user has not applied the rule {1} on the item {2}"
 msgstr "第{0}行: 用户未为物料 {2} 选择规则 {1}"
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:56
-#, fuzzy
 msgctxt "Financial Report Template"
 msgid "Row {0}: {1}"
-msgstr "行号#{}：{}"
+msgstr "行号{0}：{1}"
 
 #: erpnext/accounts/doctype/accounting_dimension_filter/accounting_dimension_filter.py:63
 msgid "Row {0}: {1} account already applied for Accounting Dimension {2}"
@@ -50065,9 +50025,8 @@ msgid "Serial No {0} is already assigned to customer {1}. Can only be returned a
 msgstr "序列号{0}已分配给客户{1}，仅可针对客户{1}进行退货"
 
 #: erpnext/stock/doctype/stock_ledger_entry/stock_ledger_entry.py:213
-#, fuzzy
 msgid "Serial No {0} is not available in the selected inventory dimensions: {1}"
-msgstr "序列号{0}不属于销售出库{1}"
+msgstr ""
 
 #: erpnext/stock/doctype/serial_and_batch_bundle/serial_and_batch_bundle.py:534
 msgid "Serial No {0} is not present in the {1} {2}, hence you can't return it against the {1} {2}"
@@ -51098,9 +51057,8 @@ msgstr "运费科目"
 #: erpnext/stock/report/delayed_item_report/delayed_item_report.py:128
 #: erpnext/stock/report/delayed_order_report/delayed_order_report.py:53
 #: erpnext/subcontracting/doctype/subcontracting_receipt/subcontracting_receipt.json
-#, fuzzy
 msgid "Shipping Address"
-msgstr "送货地址名称"
+msgstr "收货地址"
 
 #. Label of the shipping_address_display (Text Editor) field in DocType
 #. 'Purchase Order'
@@ -55855,9 +55813,8 @@ msgid "The completed quantity {0} of an operation {1} cannot be greater than the
 msgstr "操作 {1} 的已完成数量 {0} 不能大于前一操作 {3} 的已完成数量 {2}。"
 
 #: erpnext/manufacturing/doctype/job_card/job_card.py:1496
-#, fuzzy
 msgid "The completed quantity {0} of an operation {1} cannot be greater than the manufactured quantity {2} of a previous operation {3}. Submit the manufacturing entry for the operation {3} first."
-msgstr "操作 {1} 的已完成数量 {0} 不能大于前一操作 {3} 的已完成数量 {2}。"
+msgstr ""
 
 #: erpnext/manufacturing/doctype/bom/bom.py:483
 msgid "The cost of the secondary items cannot exceed the raw material cost of {0}."
@@ -60447,9 +60404,8 @@ msgstr "第{1}的物料{0}需有成本价"
 #: erpnext/manufacturing/doctype/bom_secondary_item/bom_secondary_item.json
 #: erpnext/stock/doctype/stock_entry_detail/stock_entry_detail.json
 #: erpnext/subcontracting/doctype/subcontracting_receipt_item/subcontracting_receipt_item.json
-#, fuzzy
 msgid "Valuation Type"
-msgstr "计价字段类型"
+msgstr ""
 
 #. Option for the 'Consider Tax or Charge for' (Select) field in DocType
 #. 'Purchase Taxes and Charges'
@@ -62770,10 +62726,9 @@ msgstr "[重要][ERPNext]自动补货错误"
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:422
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:432
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:540
-#, fuzzy
 msgctxt "Financial Report Template"
 msgid "[{0}] {1}"
-msgstr "{0}{1}"
+msgstr ""
 
 #: erpnext/controllers/status_updater.py:306
 msgid "`Allow Negative rates for Items`"
@@ -63445,9 +63400,8 @@ msgid "{0} is required to apply taxes. Set {0}, then select {1} again."
 msgstr ""
 
 #: erpnext/accounts/doctype/financial_report_template/financial_report_validation.py:196
-#, fuzzy
 msgid "{0} is required when {1} is {2}"
-msgstr "{} {} 已经关联了 {} {}"
+msgstr ""
 
 #: erpnext/setup/doctype/company/company.py:763
 msgid "{0} is the site's Demo Company and cannot be deleted directly. Use {1} instead."
@@ -63782,9 +63736,8 @@ msgid "{0}'s {1} cannot be after {2}'s Expected End Date."
 msgstr "{0}的{1}不得晚于{2}的预计结束日期"
 
 #: erpnext/projects/doctype/task/task.py:147
-#, fuzzy
 msgid "{0}'s {1} cannot be before {2}'s Expected Start Date."
-msgstr "{0}的{1}不得晚于{2}的预计结束日期"
+msgstr ""
 
 #: erpnext/manufacturing/doctype/job_card/job_card.py:1400
 #: erpnext/manufacturing/doctype/job_card/job_card.py:1408
@@ -63895,23 +63848,23 @@ msgstr "{} {}未影响银行账户{}"
 #~ msgid "Balance"
 #~ msgstr "余额"
 
-#~ msgid "Block a new Sales Invoice when the customer's overdue amount exceeds the Overdue Limit set on the customer."
-#~ msgstr "当客户的逾期金额超过为客户设置的逾期限额时，阻止新的销售发票。"
+msgid "Block a new Sales Invoice when the customer's overdue amount exceeds the Overdue Limit set on the customer."
+msgstr "当客户的逾期金额超过为客户设置的逾期限额时，阻止新的销售发票。"
 
 #~ msgid "Consider Process Loss"
 #~ msgstr "考量工艺损耗"
 
-#~ msgid "Frozen suppliers block ledger entries until unfrozen. Use this to temporarily lock accounting activity without disabling the supplier."
-#~ msgstr "被冻结的供应商会封锁账本条目，直至解冻。使用此功能可以暂时锁定会计活动，而无需禁用供应商。"
+msgid "Frozen suppliers block ledger entries until unfrozen. Use this to temporarily lock accounting activity without disabling the supplier."
+msgstr "被冻结的供应商会封锁账本条目，直至解冻。使用此功能可以暂时锁定会计活动，而无需禁用供应商。"
 
 #~ msgid "Internal Supplier for company {0} already exists"
 #~ msgstr "公司{0}的内部供应商已存在"
 
-#~ msgid "Is Legacy"
-#~ msgstr "是遗产"
+msgid "Is Legacy"
+msgstr "是遗产"
 
-#~ msgid "Is Legacy Scrap Item"
-#~ msgstr "是遗留废品"
+msgid "Is Legacy Scrap Item"
+msgstr "是遗留废品"
 
 #~ msgid "Item"
 #~ msgstr "物料"
@@ -63922,14 +63875,14 @@ msgstr "{} {}未影响银行账户{}"
 #~ msgid "Remarks Column Length"
 #~ msgstr "备注(摘要)文本长度"
 
-#~ msgid "Restrict Customer Over Billing"
-#~ msgstr "限制客户超额开票"
+msgid "Restrict Customer Over Billing"
+msgstr "限制客户超额开票"
 
 #~ msgid "Set Finished Good Quantity"
 #~ msgstr "设置产成品数量"
 
-#~ msgid "Shortcut"
-#~ msgstr "快捷方式"
+msgid "Shortcut"
+msgstr "快捷方式"
 
 #~ msgid "Source Document Name"
 #~ msgstr "源单据编号"
@@ -63943,287 +63896,294 @@ msgstr "{} {}未影响银行账户{}"
 #~ msgid "Timeline"
 #~ msgstr "时间线"
 
-#~ msgid "Template Type"
-#~ msgstr "模板类型"
+msgid "Template Type"
+msgstr "模板类型"
 
-#~ msgid "Purchase Order Required for Purchase Invoice & Receipt Creation"
-#~ msgstr "创建采购发票和采购入库单时必须有采购订单"
+msgid "Purchase Order Required for Purchase Invoice & Receipt Creation"
+msgstr "创建采购发票和采购入库单时必须有采购订单"
 
-#~ msgid "Purchase Receipt Required for Purchase Invoice Creation"
-#~ msgstr "创建采购发票时必须有采购入库单"
+msgid "Purchase Receipt Required for Purchase Invoice Creation"
+msgstr "创建采购发票时必须有采购入库单"
 
-#~ msgid "Prospect Name"
-#~ msgstr "意向客户名称"
+msgid "Prospect Name"
+msgstr "意向客户名称"
 
-#~ msgid "Create Contact"
-#~ msgstr "创建联系人"
+msgid "Create Contact"
+msgstr "创建联系人"
 
-#~ msgid "Operation Name"
-#~ msgstr "工序名称"
+msgid "Operation Name"
+msgstr "工序名称"
 
-#~ msgid "BOM Operations"
-#~ msgstr "物料清单工序"
+msgid "BOM Operations"
+msgstr "物料清单工序"
 
-#~ msgid "Visual Plant Floor"
-#~ msgstr "可视化车间"
+msgid "Visual Plant Floor"
+msgstr "可视化车间"
 
-#~ msgid "Edit in Full Page"
-#~ msgstr "在完整页面中编辑"
+msgid "Edit in Full Page"
+msgstr "在完整页面中编辑"
 
-#~ msgid "Bulk Rename"
-#~ msgstr "批量重命名"
+msgid "Bulk Rename"
+msgstr "批量重命名"
 
-#~ msgid "New User"
-#~ msgstr "新建用户"
+msgid "New User"
+msgstr "新建用户"
 
-#~ msgid "Rename User"
-#~ msgstr "重命名用户"
+msgid "Rename User"
+msgstr "重命名用户"
 
-#~ msgid "Role Based Permissions"
-#~ msgstr "基于角色的权限"
+msgid "Role Based Permissions"
+msgstr "基于角色的权限"
 
-#~ msgid "Managing Perm Level in Permissions Manager"
-#~ msgstr "在权限管理器中管理权限级别"
+msgid "Managing Perm Level in Permissions Manager"
+msgstr "在权限管理器中管理权限级别"
 
-#~ msgid "Sharing"
-#~ msgstr "共享"
+msgid "Sharing"
+msgstr "共享"
 
-#~ msgid "Importing and Exporting Data"
-#~ msgstr "数据导入与导出"
+msgid "Importing and Exporting Data"
+msgstr "数据导入与导出"
 
-#~ msgid "Global Settings"
-#~ msgstr "全局设置"
+msgid "Global Settings"
+msgstr "全局设置"
 
-#~ msgid "Auto Email Reports"
-#~ msgstr "自动发送邮件报表"
+msgid "Auto Email Reports"
+msgstr "自动发送邮件报表"
 
-#~ msgid "PayPal Settings"
-#~ msgstr "PayPal 设置"
+msgid "PayPal Settings"
+msgstr "PayPal 设置"
 
-#~ msgid "Razorpay Settings"
-#~ msgstr "Razorpay 设置"
+msgid "Razorpay Settings"
+msgstr "Razorpay 设置"
 
-#~ msgid "Dropbox Settings"
-#~ msgstr "Dropbox 设置"
+msgid "Dropbox Settings"
+msgstr "Dropbox 设置"
 
-#~ msgid "Stripe Settings"
-#~ msgstr "Stripe 设置"
+msgid "Stripe Settings"
+msgstr "Stripe 设置"
 
-#~ msgid "Applying Discount"
-#~ msgstr "应用折扣"
+msgid "Applying Discount"
+msgstr "应用折扣"
 
-#~ msgid "Applying Margin"
-#~ msgstr "应用利润率"
+msgid "Applying Margin"
+msgstr "应用利润率"
 
-#~ msgid "Setting Up Taxes"
-#~ msgstr "设置税费"
+msgid "Setting Up Taxes"
+msgstr "设置税费"
 
-#~ msgid "Recurring Sales Order"
-#~ msgstr "周期性销售订单"
+msgid "Recurring Sales Order"
+msgstr "周期性销售订单"
 
-#~ msgid "Drop Shipping"
-#~ msgstr "供应商直运"
+msgid "Drop Shipping"
+msgstr "供应商直运"
 
-#~ msgid "Close Sales Order"
-#~ msgstr "关闭销售订单"
+msgid "Close Sales Order"
+msgstr "关闭销售订单"
 
-#~ msgid "RFQ Video"
-#~ msgstr "询价单视频"
+msgid "RFQ Video"
+msgstr "询价单视频"
 
-#~ msgid "Recurring Purchase Order"
-#~ msgstr "周期性采购订单"
+msgid "Recurring Purchase Order"
+msgstr "周期性采购订单"
 
-#~ msgid "Item UoM"
-#~ msgstr "物料计量单位"
+msgid "Item UoM"
+msgstr "物料计量单位"
 
-#~ msgid "Supplier Item Code"
-#~ msgstr "供应商物料编码"
+msgid "Supplier Item Code"
+msgstr "供应商物料编码"
 
-#~ msgid "Delete All Related Transactions for a Company"
-#~ msgstr "删除公司的所有相关交易"
+msgid "Delete All Related Transactions for a Company"
+msgstr "删除公司的所有相关交易"
 
-#~ msgid "Managing Tree Mastes"
-#~ msgstr "管理树形主数据"
+msgid "Managing Tree Mastes"
+msgstr "管理树形主数据"
 
-#~ msgid "Accounts Opening Balance"
-#~ msgstr "科目期初余额"
+msgid "Accounts Opening Balance"
+msgstr "科目期初余额"
 
-#~ msgid "Recurring Sales Invoice"
-#~ msgstr "周期性销售发票"
+msgid "Recurring Sales Invoice"
+msgstr "周期性销售发票"
 
-#~ msgid "Point of Sale Invoice"
-#~ msgstr "销售点发票"
+msgid "Point of Sale Invoice"
+msgstr "销售点发票"
 
-#~ msgid "Point of Sale Profile"
-#~ msgstr "销售点配置"
+msgid "Point of Sale Profile"
+msgstr "销售点配置"
 
-#~ msgid "Recurring Purchase Invoice"
-#~ msgstr "周期性采购发票"
+msgid "Recurring Purchase Invoice"
+msgstr "周期性采购发票"
 
-#~ msgid "Advance Payment Entry"
-#~ msgstr "预付款凭证"
+msgid "Advance Payment Entry"
+msgstr "预付款凭证"
 
-#~ msgid "Managing Fixed Assets"
-#~ msgstr "管理固定资产"
+msgid "Managing Fixed Assets"
+msgstr "管理固定资产"
 
-#~ msgid "Budgeting"
-#~ msgstr "预算管理"
+msgid "Budgeting"
+msgstr "预算管理"
 
-#~ msgid "Item Wise Taxation"
-#~ msgstr "按物料计税"
+msgid "Item Wise Taxation"
+msgstr "按物料计税"
 
-#~ msgid "Item Codification"
-#~ msgstr "物料编码"
+msgid "Item Codification"
+msgstr "物料编码"
 
-#~ msgid "Item Variants"
-#~ msgstr "物料变体"
+msgid "Item Variants"
+msgstr "物料变体"
 
-#~ msgid "Item Valuation"
-#~ msgstr "物料计价"
+msgid "Item Valuation"
+msgstr "物料计价"
 
-#~ msgid "Auto-creation of Material Request"
-#~ msgstr "自动创建物料需求"
+msgid "Auto-creation of Material Request"
+msgstr "自动创建物料需求"
 
-#~ msgid "Stock Entry Types"
-#~ msgstr "库存移动类型"
+msgid "Stock Entry Types"
+msgstr "库存移动类型"
 
-#~ msgid "Repack Entry"
-#~ msgstr "重新包装库存凭证"
+msgid "Repack Entry"
+msgstr "重新包装库存凭证"
 
-#~ msgid "Fractions in UOM"
-#~ msgstr "计量单位中的小数数量"
+msgid "Fractions in UOM"
+msgstr "计量单位中的小数数量"
 
-#~ msgid "Opening Stock Entry"
-#~ msgstr "期初库存凭证"
+msgid "Opening Stock Entry"
+msgstr "期初库存凭证"
 
-#~ msgid "Newsletter"
-#~ msgstr "新闻简报"
+msgid "Newsletter"
+msgstr "新闻简报"
 
-#~ msgid "Sales Person Target"
-#~ msgstr "销售人员目标"
+msgid "Sales Person Target"
+msgstr "销售人员目标"
 
-#~ msgid "Sales Person in Transactions"
-#~ msgstr "交易中的销售人员"
+msgid "Sales Person in Transactions"
+msgstr "交易中的销售人员"
 
-#~ msgid "Bill of Material"
-#~ msgstr "物料清单"
+msgid "Bill of Material"
+msgstr "物料清单"
 
-#~ msgid "Nested BOM Structure"
-#~ msgstr "多层物料清单结构"
+msgid "Nested BOM Structure"
+msgstr "多层物料清单结构"
 
-#~ msgid "Customize Field"
-#~ msgstr "自定义字段"
+msgid "Customize Field"
+msgstr "自定义字段"
 
-#~ msgid "Please select Items from the Table"
-#~ msgstr "请从表格中选择物料"
+msgid "Please select Items from the Table"
+msgstr "请从表格中选择物料"
 
-#~ msgid "Reports To"
-#~ msgstr "直属上级"
+msgid "Reports To"
+msgstr "直属上级"
 
-#~ msgid "Add Holidays"
-#~ msgstr "添加节假日"
+msgid "Add Holidays"
+msgstr "添加节假日"
 
-#~ msgid "Calculating Arrival Times"
-#~ msgstr "正在计算到达时间"
+msgid "Calculating Arrival Times"
+msgstr "正在计算到达时间"
 
-#~ msgid "Optimizing Route"
-#~ msgstr "正在优化路线"
+msgid "Optimizing Route"
+msgstr "正在优化路线"
 
-#~ msgid "Include Item in Manufacturing"
-#~ msgstr "将物料纳入生产"
+msgid "Include Item in Manufacturing"
+msgstr "将物料纳入生产"
 
-#~ msgid "Show Incorrect Entries"
-#~ msgstr "显示异常分录"
+msgid "Show Incorrect Entries"
+msgstr "显示异常分录"
 
-#~ msgid "Make Merge Log"
-#~ msgstr "创建合并记录"
+msgid "Make Merge Log"
+msgstr "创建合并记录"
 
-#~ msgid "Enter {0} name."
-#~ msgstr "请输入{0}名称。"
+msgid "Enter {0} name."
+msgstr "请输入{0}名称。"
 
-#~ msgid "All Locations"
-#~ msgstr "所有地点"
+msgid "All Locations"
+msgstr "所有地点"
 
-#~ msgid "Assigning {0} to {1} (row {2})"
-#~ msgstr "正在将 {0} 分配给 {1}（第 {2} 行）"
+msgid "Assigning {0} to {1} (row {2})"
+msgstr "正在将 {0} 分配给 {1}（第 {2} 行）"
 
-#~ msgid "Splitting {0} units of {1}"
-#~ msgstr "正在拆分 {1} 的 {0} 个单位"
+msgid "Splitting {0} units of {1}"
+msgstr "正在拆分 {1} 的 {0} 个单位"
 
-#~ msgid "Create Visit"
-#~ msgstr "创建维护巡修"
+msgid "Create Visit"
+msgstr "创建维护巡修"
 
-#~ msgid "All Tasks"
-#~ msgstr "所有任务"
+msgid "All Tasks"
+msgstr "所有任务"
 
-#~ msgid "Starting a background job to create {0} {1}"
-#~ msgstr "正在启动后台任务以创建 {0} 个{1}"
+msgid "Starting a background job to create {0} {1}"
+msgstr "正在启动后台任务以创建 {0} 个{1}"
 
-#~ msgid "All Quality Procedures"
-#~ msgstr "所有质量程序"
+msgid "All Quality Procedures"
+msgstr "所有质量程序"
 
-#~ msgid "Message (if any)"
-#~ msgstr "附言（如有）"
+msgid "Message (if any)"
+msgstr "附言（如有）"
 
-#~ msgid "Print Preview"
-#~ msgstr "打印预览"
+msgid "Print Preview"
+msgstr "打印预览"
 
-#~ msgid "All Companies"
-#~ msgstr "所有公司"
+msgid "All Companies"
+msgstr "所有公司"
 
-#~ msgid "Loading..."
-#~ msgstr "正在加载……"
+msgid "Loading..."
+msgstr "正在加载……"
 
-#~ msgid "Date/Transaction Date/Value Date"
-#~ msgstr "日期/交易日期/起息日"
+msgid "Date/Transaction Date/Value Date"
+msgstr "日期/交易日期/起息日"
 
-#~ msgid "Withdrawal/Deposit"
-#~ msgstr "支出/收入"
+msgid "Withdrawal/Deposit"
+msgstr "支出/收入"
 
-#~ msgid "Description/Particulars/Remarks/Narration/Detail"
-#~ msgstr "说明/摘要/备注/用途/详情"
+msgid "Description/Particulars/Remarks/Narration/Detail"
+msgstr "说明/摘要/备注/用途/详情"
 
-#~ msgid "Reference/Ref/Transaction ID/Cheque/Check"
-#~ msgstr "参考号/交易编号/支票号"
+msgid "Reference/Ref/Transaction ID/Cheque/Check"
+msgstr "参考号/交易编号/支票号"
 
-#~ msgid "The following documents will be <strong>cancelled</strong>:"
-#~ msgstr "以下单据将被<strong>取消</strong>："
+msgid "The following documents will be <strong>cancelled</strong>:"
+msgstr "以下单据将被<strong>取消</strong>："
 
-#~ msgid "Get Unpaid Invoices"
-#~ msgstr "获取未结发票"
+msgid "Get Unpaid Invoices"
+msgstr "获取未结发票"
 
-#~ msgid "Select Invoices"
-#~ msgstr "选择发票"
+msgid "Select Invoices"
+msgstr "选择发票"
 
-#~ msgid "Unpaid invoices from {0} for {1}."
-#~ msgstr "{0} 金额为 {1} 的未结发票。"
+msgid "Unpaid invoices from {0} for {1}."
+msgstr "{0} 金额为 {1} 的未结发票。"
 
-#~ msgid "Other Charges / Deductions"
-#~ msgstr "其他费用/扣款"
+msgid "Other Charges / Deductions"
+msgstr "其他费用/扣款"
 
-#~ msgid "Clear Filters"
-#~ msgstr "清除筛选条件"
+msgid "Clear Filters"
+msgstr "清除筛选条件"
 
-#~ msgid "For more information, click on the <strong>Bank Reconciliation Statement</strong> tab below."
-#~ msgstr "如需更多信息，请点击下方的<strong>银行对账单</strong>标签页。"
+msgid "For more information, click on the <strong>Bank Reconciliation Statement</strong> tab below."
+msgstr "如需更多信息，请点击下方的<strong>银行对账单</strong>标签页。"
 
-#~ msgid "Progress"
-#~ msgstr "进度"
+msgid "Progress"
+msgstr "进度"
 
-#~ msgid "e.g. Last 3 weeks"
-#~ msgstr "例如：最近 3 周"
+msgid "e.g. Last 3 weeks"
+msgstr "例如：最近 3 周"
 
-#~ msgid "Command Palette"
-#~ msgstr "命令面板"
+msgid "Command Palette"
+msgstr "命令面板"
 
-#~ msgid "Search for a command to run..."
-#~ msgstr "搜索要运行的命令……"
+msgid "Search for a command to run..."
+msgstr "搜索要运行的命令……"
 
-#~ msgid "Please take necessary action"
-#~ msgstr "请及时处理"
+msgid "Please take necessary action"
+msgstr "请及时处理"
 
-#~ msgid "Drag to reorder"
-#~ msgstr "拖动以调整顺序"
+msgid "Drag to reorder"
+msgstr "拖动以调整顺序"
 
-#~ msgid "Preferences"
-#~ msgstr "偏好设置"
+msgid "Preferences"
+msgstr "偏好设置"
+
+#. Description of the 'Is Frozen' (Check) field in DocType 'Customer'
+#: erpnext/selling/doctype/customer/customer.json
+msgid ""
+"Blocks all further accounting entries on this customer's account. Only users"
+" with the frozen-entries role can override.\n"
+msgstr "阻止该客户账户上的所有进一步会计分录。只有具有冻结条目角色的用户才能覆盖。\n"

@@ -152,11 +152,6 @@ class SubcontractingReceipt(SubcontractingController):
 		if self.is_new() and self.get("_action") == "save" and not frappe.in_test:
 			self.get_secondary_items(recalculate_rate=True)
 
-		# after set_missing_values, so the secondary rates are computed from the same
-		# calculated per-qty costs the Get Secondary Items button uses
-		if self.is_new() and self.get("_action") == "save" and not frappe.in_test:
-			self.get_secondary_items(recalculate_rate=True)
-
 		if self.get("_action") == "submit":
 			self.validate_secondary_items()
 			self.validate_accepted_warehouse()
