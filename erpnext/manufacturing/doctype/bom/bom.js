@@ -999,26 +999,26 @@ frappe.ui.form.on("BOM Item", "items_remove", function (frm) {
 frappe.tour["BOM"] = [
 	{
 		fieldname: "item",
-		title: __("Item"),
+		title: "Item",
 		description: __(
 			"Select the Item to be manufactured. The Item name, UoM, Company, and Currency will be fetched automatically."
 		),
 	},
 	{
 		fieldname: "quantity",
-		title: __("Quantity"),
+		title: "Quantity",
 		description: __(
 			"Enter the quantity of the Item that will be manufactured from this Bill of Materials."
 		),
 	},
 	{
 		fieldname: "with_operations",
-		title: __("With Operations"),
+		title: "With Operations",
 		description: __("To add Operations tick the 'With Operations' checkbox."),
 	},
 	{
 		fieldname: "items",
-		title: __("Raw Materials"),
+		title: "Raw Materials",
 		description: __("Select the raw materials (Items) required to manufacture the Item"),
 	},
 ];
@@ -1026,7 +1026,7 @@ frappe.tour["BOM"] = [
 frappe.ui.form.on("BOM Secondary Item", {
 	valuation_type(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
-		if (row.valuation_type !== "% of FG Cost") {
+		if (row.valuation_type !== "% of Component Cost") {
 			frappe.model.set_value(cdt, cdn, "cost_allocation_per", 0);
 		}
 		if (row.valuation_type === "Valuation Rate") {

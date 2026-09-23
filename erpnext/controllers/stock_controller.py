@@ -1246,7 +1246,13 @@ class StockController(AccountsController):
 		if not landed_cost_vouchers:
 			return
 
+		from erpnext.stock.doctype.landed_cost_voucher.landed_cost_voucher import (
+			get_lcv_dimension_fields,
+			get_row_dimensions,
+		)
+
 		item_account_wise_cost = {}
+		dimension_fields = get_lcv_dimension_fields()
 
 		row_fieldname = "purchase_receipt_item"
 		if self.doctype == "Stock Entry":
@@ -1268,28 +1274,36 @@ class StockController(AccountsController):
 
 			for item in landed_cost_voucher_doc.items:
 				if item.receipt_document == self.name:
+					charges = item_account_wise_cost.setdefault((item.item_code, item.get(row_fieldname)), {})
+
 					for account in landed_cost_voucher_doc.taxes:
 						exchange_rate = account.exchange_rate or 1
-						item_account_wise_cost.setdefault((item.item_code, item.get(row_fieldname)), {})
-						item_account_wise_cost[(item.item_code, item.get(row_fieldname))].setdefault(
-							account.expense_account, {"amount": 0.0, "base_amount": 0.0}
+						dimensions = get_row_dimensions(account, item, dimension_fields)
+						group_key = (
+							account.expense_account,
+							tuple(dimensions.get(field) for field in dimension_fields),
 						)
 
-						item_row = item_account_wise_cost[(item.item_code, item.get(row_fieldname))][
-							account.expense_account
-						]
+						item_row = charges.get(group_key)
+						if item_row is None:
+							item_row = charges[group_key] = frappe._dict(
+								expense_account=account.expense_account,
+								amount=0.0,
+								base_amount=0.0,
+								dimensions=dimensions,
+							)
 
 						if total_item_cost > 0:
-							item_row["amount"] += account.amount * item.get(based_on_field) / total_item_cost
+							item_row.amount += account.amount * item.get(based_on_field) / total_item_cost
 
-							item_row["base_amount"] += (
+							item_row.base_amount += (
 								account.base_amount * item.get(based_on_field) / total_item_cost
 							)
 						else:
-							item_row["amount"] += item.applicable_charges / exchange_rate
-							item_row["base_amount"] += item.applicable_charges
+							item_row.amount += item.applicable_charges / exchange_rate
+							item_row.base_amount += item.applicable_charges
 
-		return item_account_wise_cost
+		return {key: list(charges.values()) for key, charges in item_account_wise_cost.items()}
 
 	def validate_inventory_dimension_mandatory(self):
 		# Mandatory inventory dimensions are enforced here (instead of via field-level `reqd`)
@@ -1976,6 +1990,7 @@ class StockController(AccountsController):
 		voucher_detail_no=None,
 		item=None,
 		posting_date=None,
+		dimensions=None,
 	):
 		gl_entry = {
 			"account": account,
@@ -2000,6 +2015,9 @@ class StockController(AccountsController):
 
 		if posting_date:
 			gl_entry.update({"posting_date": posting_date})
+
+		if dimensions:
+			gl_entry.update(dimensions)
 
 		gl_entries.append(self.get_gl_dict(gl_entry, item=item))
 
@@ -2179,7 +2197,7 @@ def show_accounting_ledger_preview(company: str, doctype: str, docname: str):
 
 @frappe.whitelist()
 def show_stock_ledger_preview(company: str, doctype: str, docname: str):
-	filters = frappe._dict(company=company)
+	filters = frappe._dict(company=company, valuation_field_type="Currency")
 	doc = frappe.get_lazy_doc(doctype, docname)
 	doc.check_permission("read")
 	doc.run_method("before_sl_preview")
@@ -2220,7 +2238,7 @@ def get_accounting_ledger_preview(doc, filters):
 	columns = get_gl_columns(filters)
 	gl_entries = get_gl_entries_for_preview(doc.doctype, doc.name, fields)
 
-	gl_columns = get_columns(columns, fields)
+	gl_columns = get_columns(columns, fields, erpnext.get_company_currency(filters.company))
 	gl_data = get_data(fields, gl_entries)
 
 	return gl_columns, gl_data
@@ -2262,7 +2280,7 @@ def get_stock_ledger_preview(doc, filters):
 		columns = get_sl_columns(filters)
 		sl_entries = get_sl_entries_for_preview(doc.doctype, doc.name, fields)
 
-		sl_columns = get_columns(columns, columns_fields)
+		sl_columns = get_columns(columns, columns_fields, erpnext.get_company_currency(filters.company))
 		sl_data = get_data(columns_fields, sl_entries)
 
 	return sl_columns, sl_data
@@ -2281,7 +2299,8 @@ def get_sl_entries_for_preview(doctype, docname, fields):
 			entry["out_qty"] = abs(entry.actual_qty)
 			entry["in_qty"] = 0
 
-		entry["in_out_rate"] = entry["valuation_rate"]
+		if entry.actual_qty < 0:
+			entry["in_out_rate"] = entry.stock_value_difference / entry.actual_qty
 
 	return sl_entries
 
@@ -2290,12 +2309,23 @@ def get_gl_entries_for_preview(doctype, docname, fields):
 	return frappe.get_all("GL Entry", filters={"voucher_type": doctype, "voucher_no": docname}, fields=fields)
 
 
-def get_columns(raw_columns, fields):
-	return [
-		{"name": d.get("label"), "editable": False, "width": 110, "fieldtype": d.get("fieldtype")}
-		for d in raw_columns
-		if not d.get("hidden") and d.get("fieldname") in fields
-	]
+def get_columns(raw_columns, fields, currency):
+	columns = []
+	for source_column in raw_columns:
+		if source_column.get("hidden") or source_column.get("fieldname") not in fields:
+			continue
+
+		column = {
+			"name": source_column.get("label"),
+			"editable": False,
+			"width": 110,
+			"fieldtype": source_column.get("fieldtype"),
+		}
+		if column["fieldtype"] == "Currency":
+			column["options"] = currency
+		columns.append(column)
+
+	return columns
 
 
 def get_data(raw_columns, raw_data):
