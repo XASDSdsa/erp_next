@@ -1,0 +1,35 @@
+name: Production deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate-image:
+        description: Immutable image digest already loaded on the production server
+        required: true
+        type: string
+      rollback-image:
+        description: Previous healthy immutable image digest recorded for rollback
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: XASDSdsa/frappe-ecosystem-cicd/.github/workflows/frappe-deploy.yml@v4
+    with:
+      environment-name: production
+      candidate-image: ${{ inputs.candidate-image }}
+      rollback-image: ${{ inputs.rollback-image }}
+      deploy-command: sudo /usr/local/sbin/frappe-erpnext-production-entrypoint deploy "$CANDIDATE_IMAGE"
+      rollback-command: sudo /usr/local/sbin/frappe-erpnext-production-entrypoint rollback "$ROLLBACK_IMAGE"
+      healthcheck-url: https://erp-sunny.leyabilliards.com/api/method/ping
+      healthcheck-host: erp-sunny.leyabilliards.com
+      healthcheck-expected-body: '{"message":"pong"}'
+      expected-status: 200
+      healthcheck-attempts: 60
+      healthcheck-interval-seconds: 2
+      healthcheck-timeout-seconds: 10
+      deployment-timeout-minutes: 45
+    secrets: inherit
