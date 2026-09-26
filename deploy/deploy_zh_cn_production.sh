@@ -15,6 +15,8 @@ PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://${SITE}}"
 WAIT_ATTEMPTS="${WAIT_ATTEMPTS:-60}"
 WAIT_SECONDS="${WAIT_SECONDS:-2}"
 BACKUP_DIR="${BACKUP_DIR:-build/production-backups/$(date +%Y%m%d-%H%M%S)}"
+RELEASE_NAME="${RELEASE_NAME:-$(date +%Y%m%d-%H%M%S)}"
+CANONICAL_BACKUP_DIR="${CANONICAL_BACKUP_DIR:-/home/frappe/frappe-bench/sites/${SITE}/private/deployment-backups/${RELEASE_NAME}}"
 
 SERVICES=(backend websocket frontend queue-long queue-short scheduler)
 EXPECTED_TRANSLATIONS=(
@@ -125,6 +127,22 @@ missing = [label for label, matches in checks.items() if not any(matches(path.na
 assert not missing, f"Current production backup is incomplete: {missing}"
 print(f"PRODUCTION_BACKUP_VERIFIED path={backup_dir} files={len(files)}")
 '
+	docker exec "$BACKEND" install -d -m 0700 "$CANONICAL_BACKUP_DIR"
+	docker exec "$BACKEND" cp -a \
+		/home/frappe/frappe-bench/sites/"$SITE"/private/backups/. \
+		"$CANONICAL_BACKUP_DIR/"
+	docker exec "$BACKEND" sh -c '
+set -eu
+backup_dir="$1"
+for required in \
+	"$backup_dir"/*-site_config_backup.json \
+	"$backup_dir"/*-database.sql.gz \
+	"$backup_dir"/*-files.tgz \
+	"$backup_dir"/*-private-files.tgz; do
+	test -s "$required"
+done
+' -- "$CANONICAL_BACKUP_DIR"
+	echo "PRODUCTION_BACKUP_CANONICAL_VERIFIED path=$CANONICAL_BACKUP_DIR"
 }
 
 set_maintenance_off() {
