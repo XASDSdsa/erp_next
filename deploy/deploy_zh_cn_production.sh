@@ -134,6 +134,13 @@ print(f"PRODUCTION_BACKUP_VERIFIED path={backup_dir} files={len(files)}")
 	docker exec "$BACKEND" sh -c '
 set -eu
 backup_dir="$1"
+chmod 700 "$backup_dir"
+find "$backup_dir" -type d -exec chmod 700 {} +
+find "$backup_dir" -type f -exec chmod 600 {} +
+' -- "$CANONICAL_BACKUP_DIR"
+	docker exec "$BACKEND" sh -c '
+set -eu
+backup_dir="$1"
 for required in \
 	"$backup_dir"/*-site_config_backup.json \
 	"$backup_dir"/*-database.sql.gz \
