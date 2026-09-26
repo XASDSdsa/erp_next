@@ -1,4 +1,18 @@
 frappe.listview_settings["Delivery Note"] = {
+	method: "erpnext.stock.doctype.shipment.shipment_summary.get_delivery_notes",
+	additional_columns: [
+		{
+			fieldname: "shipment",
+			fieldtype: "Data",
+			label: "Shipment",
+			in_list_view: 1,
+			insert_after: "status_field",
+			width: 220,
+		},
+	],
+	formatters: {
+		shipment: (value, df, doc) => erpnext.shipment_summary.format(value, df, doc),
+	},
 	add_fields: [
 		"customer",
 		"customer_name",
@@ -27,6 +41,9 @@ frappe.listview_settings["Delivery Note"] = {
 		}
 	},
 	onload: function (doclist) {
+		if (doclist.view_name === "List") {
+			doclist.method = frappe.listview_settings["Delivery Note"].method;
+		}
 		const action = () => {
 			const selected_docs = doclist.get_checked_items();
 			const docnames = doclist.get_checked_items(true);

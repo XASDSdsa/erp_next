@@ -1,5 +1,6 @@
 import "./conf";
 import "./utils";
+import "./utils/shipment_summary";
 import "./stock_reservation";
 import "./queries";
 import "./sms_manager";

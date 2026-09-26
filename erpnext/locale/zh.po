@@ -66976,3 +66976,39 @@ msgstr "阻止该客户账户上的所有进一步会计分录。只有具有冻
 
 #~ msgid "Timeline"
 #~ msgstr "时间线"
+
+#: erpnext/public/js/utils/shipment_summary.js
+msgid "Shipment information is unavailable"
+msgstr "运单信息暂不可用"
+
+#: erpnext/public/js/utils/shipment_summary.js
+msgid "No permission to view the linked Shipment"
+msgstr "无权查看关联运单"
+
+#: erpnext/public/js/utils/shipment_summary.js
+msgid "No Shipment created"
+msgstr "未建运单"
+
+#: erpnext/public/js/utils/shipment_summary.js
+msgid "Delivery Note is cancelled but the Shipment is active"
+msgstr "出库单已取消，运单仍有效"
+
+#: erpnext/public/js/utils/shipment_summary.js
+msgid "Historical Shipment"
+msgstr "历史运单"
+
+#: erpnext/public/js/utils/shipment_summary.js
+msgid "Transport Status: {0}"
+msgstr "运输状态：{0}"
+
+#: erpnext/public/js/utils/shipment_summary.js
+msgid "{0} other Shipments"
+msgstr "另有 {0} 个运单"
+
+#: erpnext/public/js/utils/shipment_summary.js
+msgid "View Historical Shipment"
+msgstr "查看历史运单"
+
+#: erpnext/public/js/utils/shipment_summary.js
+msgid "View Shipment"
+msgstr "查看运单"

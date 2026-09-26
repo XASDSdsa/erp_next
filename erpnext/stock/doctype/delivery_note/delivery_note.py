@@ -244,6 +244,9 @@ class DeliveryNote(SellingController):
 
 	def onload(self):
 		super().onload()
+		from erpnext.stock.doctype.shipment.shipment_summary import load_delivery_note_shipping_summary
+
+		load_delivery_note_shipping_summary(self)
 
 		if self.docstatus == 0:
 			self.set_onload("has_unpacked_items", self.has_unpacked_items())

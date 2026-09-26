@@ -79,6 +79,7 @@ frappe.ui.form.on("Delivery Note", {
 	},
 
 	refresh: function (frm) {
+		erpnext.shipment_summary.show_on_delivery_note(frm);
 		if (
 			frm.doc.docstatus === 1 &&
 			frm.doc.is_return === 1 &&
