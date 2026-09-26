@@ -1,0 +1,23 @@
+name: Ecosystem CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - version-16
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ecosystem-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ecosystem:
+    uses: XASDSdsa/frappe-ecosystem-cicd/.github/workflows/frappe-ci.yml@v1
+    with:
+      python-version: "3.14"
+      node-version: "24"
+      test-command: python -m compileall -q erpnext
