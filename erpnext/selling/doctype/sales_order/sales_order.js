@@ -7,6 +7,53 @@ erpnext.accounts.taxes.setup_tax_filters("Sales Taxes and Charges");
 erpnext.accounts.taxes.setup_tax_validations("Sales Order");
 erpnext.sales_common.setup_selling_controller();
 
+const sales_order_payment_message_selector = ".erpnext-sales-order-payment";
+
+function paint_sales_order_payment_status(frm) {
+	const message_container = frm.layout && frm.layout.message;
+	if (!message_container || !message_container.length) return;
+
+	// Form refresh can run more than once. Remove only this feature's prior block
+	// so unrelated ERPNext or app messages remain untouched.
+	message_container.find(sales_order_payment_message_selector).remove();
+	if (frm.doc.docstatus !== 1) return;
+
+	const total = flt(frm.doc.rounded_total || frm.doc.grand_total);
+	let paid = flt(frm.doc.advance_paid);
+	const currency = frm.doc.currency;
+	if (frm.doc.party_account_currency && frm.doc.party_account_currency !== currency) {
+		const conversion_rate = flt(frm.doc.conversion_rate);
+		if (conversion_rate <= 0) return;
+		paid /= conversion_rate;
+	}
+
+	const remaining = Math.max(total - paid, 0);
+	const tolerance = 0.00001;
+	let status = "未收款";
+	let color = "orange";
+	if (total <= tolerance || remaining <= tolerance) {
+		status = "已收清";
+		color = "green";
+	} else if (paid > tolerance) {
+		status = "未收 " + format_currency(remaining, currency);
+		color = "blue";
+	}
+
+	const text =
+		"本单 " +
+		format_currency(total, currency) +
+		"，已收款 " +
+		format_currency(paid, currency) +
+		"，" +
+		status;
+	const $message = $("<span>")
+		.addClass("erpnext-sales-order-payment")
+		.text(text)
+		.prop("outerHTML");
+
+	frm.layout.show_message($message, color);
+}
+
 frappe.ui.form.on("Sales Order", {
 	setup: function (frm) {
 		frm.custom_make_buttons = {
@@ -178,6 +225,8 @@ frappe.ui.form.on("Sales Order", {
 		if (frm.doc.docstatus > 0) {
 			frm.set_df_property("reserve_stock", "description", null);
 		}
+
+		paint_sales_order_payment_status(frm);
 	},
 
 	get_items_from_internal_purchase_order(frm) {
