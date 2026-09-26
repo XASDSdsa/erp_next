@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   deploy:
-    uses: XASDSdsa/frappe-ecosystem-cicd/.github/workflows/frappe-deploy.yml@v4
+    uses: XASDSdsa/frappe-ecosystem-cicd/.github/workflows/frappe-deploy.yml@v5
     with:
       environment-name: production
       candidate-image: ${{ inputs.candidate-image }}
