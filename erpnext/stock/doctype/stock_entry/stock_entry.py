@@ -9,7 +9,7 @@ import frappe
 from frappe import _, bold
 from frappe.model.mapper import get_mapped_doc
 from frappe.query_builder import DocType
-from frappe.query_builder.functions import Max, Sum
+from frappe.query_builder.functions import Coalesce, Max, Sum
 from frappe.utils import (
 	cint,
 	comma_or,
@@ -33,6 +33,9 @@ from erpnext.manufacturing.doctype.bom.bom import (
 	get_secondary_items_from_sub_assemblies,
 	validate_bom_no,
 )
+from erpnext.manufacturing.doctype.production_plan.work_order_quantities import (
+	ProductionPlanWorkOrderQuantities,
+)
 from erpnext.setup.doctype.brand.brand import get_brand_defaults
 from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from erpnext.stock.doctype.batch.batch import get_batch_qty
@@ -54,7 +57,7 @@ from erpnext.stock.serial_batch_bundle import (
 	get_serial_or_batch_items,
 )
 from erpnext.stock.stock_ledger import NegativeStockError, get_previous_sle, get_valuation_rate
-from erpnext.stock.utils import get_bin, get_combine_datetime, get_incoming_rate
+from erpnext.stock.utils import _get_incoming_rate, get_bin, get_combine_datetime
 
 
 class FinishedGoodError(frappe.ValidationError):
@@ -89,7 +92,25 @@ def is_costed_out_of_finished_item(row) -> bool:
 	A secondary item that is not linked to a BOM has no cost allocation of its own, so it is
 	valued the way the legacy scrap item was: its cost is deducted from the finished good.
 	"""
-	return bool(row.is_legacy_scrap_item or (row.type and not row.bom_secondary_item))
+	return bool(
+		row.valuation_type in ("Valuation Rate", "Manual")
+		or (row.secondary_item_type and not row.bom_secondary_item)
+	)
+
+
+def get_secondary_item_key(row):
+	"""Identity of a secondary output: its BOM row when linked, else (item, type).
+
+	Grouping only by (item, type) would merge rows that different BOMs of the same work
+	order produce, and one BOM row's percentage or valuation mode would then govern the
+	other BOMs' quantities too."""
+	if row.get("bom_secondary_item"):
+		return row.bom_secondary_item
+
+	return (
+		row.item_code,
+		row.secondary_item_type or ("Scrap" if row.get("valuation_type") == "Valuation Rate" else ""),
+	)
 
 
 def _qty_tolerance(precision: int) -> float:
@@ -279,6 +300,7 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 		if self.purpose in ("Manufacture", "Repack"):
 			self.mark_finished_and_secondary_items()
+			self.set_bomless_secondary_valuation_types()
 			if not self.job_card:
 				self.validate_finished_goods()
 			else:
@@ -973,7 +995,7 @@ class StockEntry(StockController, SubcontractingInwardController):
 					frappe.throw(_("Target warehouse is mandatory for row {0}").format(d.idx))
 
 			if self.purpose in ["Manufacture", "Repack"]:
-				if d.is_finished_item or d.type or d.is_legacy_scrap_item:
+				if d.is_finished_item or d.secondary_item_type or d.valuation_type:
 					d.s_warehouse = None
 					if not d.t_warehouse:
 						frappe.throw(_("Target warehouse is mandatory for row {0}").format(d.idx))
@@ -984,7 +1006,7 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 			if self.purpose == "Disassemble":
 				if has_bom:
-					if d.is_finished_item or d.type or d.is_legacy_scrap_item:
+					if d.is_finished_item or d.secondary_item_type or d.valuation_type:
 						d.t_warehouse = None
 						if not d.s_warehouse:
 							frappe.throw(_("Source warehouse is mandatory for row {0}").format(d.idx))
@@ -1001,6 +1023,46 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 			if not (d.s_warehouse or d.t_warehouse):
 				frappe.throw(_("At least one warehouse is mandatory"))
+
+		self.validate_transit_warehouses()
+
+	def validate_transit_warehouses(self):
+		if not self.add_to_transit:
+			return
+
+		target_warehouses = {row.t_warehouse for row in self.items if row.t_warehouse}
+		if self.to_warehouse:
+			target_warehouses.add(self.to_warehouse)
+
+		if not target_warehouses:
+			return
+
+		transit_warehouses = set(
+			frappe.get_all(
+				"Warehouse",
+				filters={
+					"name": ("in", list(target_warehouses)),
+					"warehouse_type": "Transit",
+					"company": self.company,
+				},
+				pluck="name",
+			)
+		)
+
+		if self.to_warehouse and self.to_warehouse not in transit_warehouses:
+			frappe.throw(
+				_(
+					"Default Target Warehouse {0} must be a Transit warehouse when Add to Transit is enabled."
+				).format(frappe.bold(self.to_warehouse))
+			)
+
+		for row in self.items:
+			if row.t_warehouse and row.t_warehouse not in transit_warehouses:
+				frappe.throw(
+					_(
+						"Row #{0}: Target Warehouse {1} must be a Transit warehouse when Add to Transit is enabled."
+					).format(row.idx, frappe.bold(row.t_warehouse))
+				)
 
 	def validate_work_order(self):
 		if self.purpose in (
@@ -1461,13 +1523,20 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 		items = []
 		# Set basic rate for incoming items
-		finished_items_last = sorted(self.get("items"), key=lambda row: cint(row.is_finished_item))
+		# Own-cost rows first: their value is deducted from the basis the percentage
+		# allocated rows and the finished good split, so it must be known before those.
+		finished_items_last = sorted(
+			self.get("items"),
+			key=lambda row: (cint(row.is_finished_item), cint(not is_costed_out_of_finished_item(row))),
+		)
 		for d in finished_items_last:
 			if d.s_warehouse or d.set_basic_rate_manually:
+				if d.set_basic_rate_manually:
+					d.basic_amount = flt(flt(d.transfer_qty) * flt(d.basic_rate), d.precision("basic_amount"))
 				continue
 
 			# Zero-qty secondary items carry no inventory value; skip rate calculation
-			if d.type and flt(d.transfer_qty) == 0:
+			if d.secondary_item_type and flt(d.transfer_qty) == 0:
 				d.basic_rate = 0.0
 				d.basic_amount = 0.0
 				continue
@@ -1490,12 +1559,18 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 				if self.bom_no:
 					d.basic_rate *= frappe.get_value("BOM", self.bom_no, "cost_allocation_per") / 100
-			elif d.type and d.bom_secondary_item:
+			elif is_costed_out_of_finished_item(d):
+				# Recomputed every time: a rate fetched before the target warehouse was set
+				# must not stick to the row.
+				d.basic_rate = self.get_row_valuation_rate(d, raise_error_if_no_rate)
+				has_derived_rate = True
+			elif d.secondary_item_type and d.bom_secondary_item:
 				cost_allocation_per = flt(
 					frappe.get_value("BOM Secondary Item", d.bom_secondary_item, "cost_allocation_per")
 				)
 				if flt(d.transfer_qty):
-					d.basic_rate = (secondary_items_cost_basis * (cost_allocation_per / 100)) / d.transfer_qty
+					allocation_basis = secondary_items_cost_basis - self.get_costed_out_items_cost()
+					d.basic_rate = (allocation_basis * (cost_allocation_per / 100)) / d.transfer_qty
 					has_derived_rate = True
 
 			# A rate of zero that was derived rather than left unset is a real cost. Falling back to
@@ -1504,18 +1579,7 @@ class StockEntry(StockController, SubcontractingInwardController):
 				if self.is_new():
 					raise_error_if_no_rate = False
 
-				d.basic_rate = get_valuation_rate(
-					d.item_code,
-					d.t_warehouse,
-					self.doctype,
-					self.name,
-					d.allow_zero_valuation_rate,
-					currency=erpnext.get_company_currency(self.company),
-					company=self.company,
-					raise_error_if_no_rate=raise_error_if_no_rate,
-					batch_no=d.batch_no,
-					serial_and_batch_bundle=d.serial_and_batch_bundle,
-				)
+				d.basic_rate = self.get_row_valuation_rate(d, raise_error_if_no_rate)
 
 			# do not round off basic rate to avoid precision loss
 			d.basic_rate = flt(d.basic_rate)
@@ -1535,11 +1599,40 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 			frappe.msgprint(message, alert=True)
 
+	def get_row_valuation_rate(self, d, raise_error_if_no_rate):
+		return get_valuation_rate(
+			d.item_code,
+			d.t_warehouse,
+			self.doctype,
+			self.name,
+			d.allow_zero_valuation_rate,
+			currency=erpnext.get_company_currency(self.company),
+			company=self.company,
+			raise_error_if_no_rate=raise_error_if_no_rate,
+			batch_no=d.batch_no,
+			serial_and_batch_bundle=d.serial_and_batch_bundle,
+			posting_datetime=get_combine_datetime(self.posting_date, self.posting_time),
+			creation=self.first_sle_creation,
+		)
+
+	@property
+	def first_sle_creation(self):
+		"""Creation of this entry's earliest ledger entry, if it has posted any yet."""
+		return frappe.db.get_value(
+			"Stock Ledger Entry",
+			{"voucher_no": self.name, "voucher_type": self.doctype, "is_cancelled": 0},
+			"creation",
+			order_by="creation asc",
+		)
+
 	def has_consumption_basis(self) -> bool:
 		"""Whether the cost of the consumed items is known, even when that cost is zero."""
 		if any(d.s_warehouse for d in self.get("items")):
 			return True
 
+		return self.is_rm_cost_from_consumption_entries()
+
+	def is_rm_cost_from_consumption_entries(self) -> bool:
 		settings = frappe.get_single("Manufacturing Settings")
 		if settings.material_consumption and settings.get_rm_cost_from_consumption_entry and self.work_order:
 			return bool(self.get_consumption_entries())
@@ -1566,7 +1659,7 @@ class StockEntry(StockController, SubcontractingInwardController):
 			if d.s_warehouse:
 				if reset_outgoing_rate:
 					args = self.get_args_for_incoming_rate(d)
-					rate = get_incoming_rate(args, raise_error_if_no_rate)
+					rate = _get_incoming_rate(args, raise_error_if_no_rate)
 					if rate >= 0:
 						d.basic_rate = rate
 
@@ -1596,6 +1689,8 @@ class StockEntry(StockController, SubcontractingInwardController):
 		)
 
 	def get_basic_rate_for_repacked_items(self, finished_item_qty, outgoing_items_cost):
+		outgoing_items_cost -= self.get_costed_out_items_cost()
+
 		finished_items = [
 			d.item_code for d in self.get("items") if d.is_finished_item and not d.set_basic_rate_manually
 		]
@@ -1612,6 +1707,36 @@ class StockEntry(StockController, SubcontractingInwardController):
 					]
 				)
 				return flt(outgoing_items_cost / total_fg_qty)
+
+	def set_bomless_secondary_valuation_types(self):
+		"""Secondary rows without a BOM link choose their own costing: valuation rate or manual.
+
+		There is no percentage to allocate without a BOM row, so % of Component Cost is rejected."""
+		for d in self.get("items"):
+			if d.bom_secondary_item:
+				continue
+
+			if not d.secondary_item_type:
+				if d.valuation_type:
+					d.valuation_type = ""
+					d.set_basic_rate_manually = 0
+				continue
+
+			if d.valuation_type == "% of Component Cost":
+				frappe.throw(
+					_(
+						"Row #{0}: % of Component Cost needs a BOM secondary item. Choose Valuation Rate or Manual for {1}."
+					).format(d.idx, frappe.bold(d.item_code))
+				)
+
+			if not d.valuation_type:
+				d.valuation_type = "Valuation Rate"
+
+			d.set_basic_rate_manually = cint(d.valuation_type == "Manual")
+
+	def get_costed_out_items_cost(self) -> float:
+		"""Total value of the rows that are deducted from the cost the other incoming rows split."""
+		return sum(flt(d.basic_amount) for d in self.get("items") if is_costed_out_of_finished_item(d))
 
 	def get_secondary_items_cost_basis(self, outgoing_items_cost) -> float:
 		"""The cost a BOM allocation splits: the consumed rows, or the entry that replaced them."""
@@ -1647,16 +1772,18 @@ class StockEntry(StockController, SubcontractingInwardController):
 		self, finished_item_qty, outgoing_items_cost=0, has_consumption_basis=False
 	) -> float:
 		settings = frappe.get_single("Manufacturing Settings")
-		scrap_items_cost = sum(
-			[flt(d.basic_amount) for d in self.get("items") if is_costed_out_of_finished_item(d)]
-		)
+		scrap_items_cost = self.get_costed_out_items_cost()
 
 		if settings.material_consumption:
 			if settings.get_rm_cost_from_consumption_entry and self.work_order:
 				# Validate only if Material Consumption Entry exists for the Work Order.
 				if self.get_consumption_entries():
 					for item in self.items:
-						if not item.is_finished_item and not item.type and not item.is_legacy_scrap_item:
+						if (
+							not item.is_finished_item
+							and not item.secondary_item_type
+							and not item.valuation_type
+						):
 							label = frappe.get_meta(settings.doctype).get_label(
 								"get_rm_cost_from_consumption_entry"
 							)
@@ -1703,22 +1830,28 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 		self.total_additional_costs = sum(flt(t.base_amount) for t in self.get("additional_costs"))
 
-		if self.purpose in ("Repack", "Manufacture"):
-			incoming_items_cost = sum(flt(t.basic_amount) for t in self.get("items") if t.is_finished_item)
-		else:
-			incoming_items_cost = sum(flt(t.basic_amount) for t in self.get("items") if t.t_warehouse)
-
-		if not incoming_items_cost:
-			return
+		incoming_items, basis, total_basis = self.get_additional_cost_allocation()
 
 		for d in self.get("items"):
-			if self.purpose in ("Repack", "Manufacture") and not d.is_finished_item:
-				d.additional_cost = 0
-				continue
-			elif not d.t_warehouse:
-				d.additional_cost = 0
-				continue
-			d.additional_cost = (flt(d.basic_amount) / incoming_items_cost) * self.total_additional_costs
+			d.additional_cost = 0
+
+		if not total_basis:
+			return
+
+		for d in incoming_items:
+			d.additional_cost = (flt(d.get(basis)) / total_basis) * self.total_additional_costs
+
+	def get_additional_cost_allocation(self):
+		if self.purpose in ("Repack", "Manufacture"):
+			incoming_items = [d for d in self.get("items") if d.is_finished_item]
+		else:
+			incoming_items = [d for d in self.get("items") if d.t_warehouse]
+
+		total_basic_amount = sum(flt(d.basic_amount) for d in incoming_items)
+		if total_basic_amount:
+			return incoming_items, "basic_amount", total_basic_amount
+
+		return incoming_items, "transfer_qty", sum(flt(d.transfer_qty) for d in incoming_items)
 
 	def update_valuation_rate(self, reset_outgoing_rate=True):
 		for d in self.get("items"):
@@ -2062,13 +2195,13 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 		for d in self.items:
 			if d.t_warehouse and not d.s_warehouse:
-				if d.type or d.is_legacy_scrap_item:
+				if d.secondary_item_type or d.valuation_type:
 					d.is_finished_item = 0
 				elif self.purpose == "Repack" or d.item_code == finished_item:
 					d.is_finished_item = 1
 			else:
 				d.is_finished_item = 0
-				d.type = ""
+				d.secondary_item_type = ""
 
 	def get_finished_item(self):
 		finished_item = None
@@ -2285,32 +2418,20 @@ class StockEntry(StockController, SubcontractingInwardController):
 	def get_gl_entries(self, inventory_account_map):
 		gl_entries = super().get_gl_entries(inventory_account_map)
 
-		if self.purpose in ("Repack", "Manufacture"):
-			total_basic_amount = sum(flt(t.basic_amount) for t in self.get("items") if t.is_finished_item)
-		else:
-			total_basic_amount = sum(flt(t.basic_amount) for t in self.get("items") if t.t_warehouse)
-
-		divide_based_on = total_basic_amount
-
-		if self.get("additional_costs") and not total_basic_amount:
-			# if total_basic_amount is 0, distribute additional charges based on qty
-			divide_based_on = sum(item.qty for item in list(self.get("items")))
+		incoming_items, basis, divide_based_on = self.get_additional_cost_allocation()
 
 		item_account_wise_additional_cost = {}
 
 		for t in self.get("additional_costs"):
-			for d in self.get("items"):
-				if self.purpose in ("Repack", "Manufacture") and not d.is_finished_item:
-					continue
-				elif not d.t_warehouse:
-					continue
-
+			if not divide_based_on:
+				continue
+			for d in incoming_items:
 				item_account_wise_additional_cost.setdefault((d.item_code, d.name), {})
 				item_account_wise_additional_cost[(d.item_code, d.name)].setdefault(
 					t.expense_account, {"amount": 0.0, "base_amount": 0.0}
 				)
 
-				multiply_based_on = d.basic_amount if total_basic_amount else d.qty
+				multiply_based_on = flt(d.get(basis))
 
 				item_account_wise_additional_cost[(d.item_code, d.name)][t.expense_account]["amount"] += (
 					flt(t.amount * multiply_based_on) / divide_based_on
@@ -2368,6 +2489,10 @@ class StockEntry(StockController, SubcontractingInwardController):
 		return process_gl_map(gl_entries, from_repost=frappe.flags.through_repost_item_valuation)
 
 	def set_gl_entries_for_landed_cost_voucher(self, gl_entries, inventory_account_map):
+		from erpnext.stock.doctype.landed_cost_voucher.landed_cost_voucher import (
+			get_custom_dimension_overrides,
+		)
+
 		landed_cost_entries = self.get_item_account_wise_lcv_entries()
 		if not landed_cost_entries:
 			return
@@ -2376,52 +2501,53 @@ class StockEntry(StockController, SubcontractingInwardController):
 			if item.s_warehouse:
 				continue
 
-			if (item.item_code, item.name) in landed_cost_entries:
-				for account, amount in landed_cost_entries[(item.item_code, item.name)].items():
-					account_currency = get_account_currency(account)
-					credit_amount = (
-						flt(amount["base_amount"])
-						if (amount["base_amount"] or account_currency != self.company_currency)
-						else flt(amount["amount"])
-					)
+			for entry in landed_cost_entries.get((item.item_code, item.name), []):
+				if not (entry.amount or entry.base_amount):
+					continue
 
-					_inv_dict = self.get_inventory_account_dict(item, inventory_account_map, "t_warehouse")
-					gl_entries.append(
-						self.get_gl_dict(
-							{
-								"account": account,
-								"against": _inv_dict["account"],
-								"cost_center": item.cost_center,
-								"debit": 0.0,
-								"credit": credit_amount,
-								"remarks": _("Accounting Entry for LCV in Stock Entry {0}").format(self.name),
-								"credit_in_account_currency": flt(amount["amount"]),
-								"account_currency": account_currency,
-								"project": item.project,
-							},
-							item=item,
-						)
-					)
+				account_currency = get_account_currency(entry.expense_account)
+				credit_amount = (
+					flt(entry.base_amount)
+					if (entry.base_amount or account_currency != self.company_currency)
+					else flt(entry.amount)
+				)
 
-					account_currency = get_account_currency(item.expense_account)
+				_inv_dict = self.get_inventory_account_dict(item, inventory_account_map, "t_warehouse")
+				gl_dict = self.get_gl_dict(
+					{
+						"account": entry.expense_account,
+						"against": _inv_dict["account"],
+						"cost_center": entry.dimensions.cost_center or item.cost_center,
+						"debit": 0.0,
+						"credit": credit_amount,
+						"remarks": _("Accounting Entry for LCV in Stock Entry {0}").format(self.name),
+						"credit_in_account_currency": flt(entry.amount),
+						"account_currency": account_currency,
+						"project": entry.dimensions.project or item.project,
+					},
+					item=item,
+				)
+				gl_dict.update(get_custom_dimension_overrides(entry))
+				gl_entries.append(gl_dict)
 
-					# credit amount in negative to knock off the debit entry
-					gl_entries.append(
-						self.get_gl_dict(
-							{
-								"account": item.expense_account,
-								"against": _inv_dict["account"],
-								"cost_center": item.cost_center,
-								"debit": 0.0,
-								"credit": credit_amount * -1,
-								"remarks": _("Accounting Entry for LCV in Stock Entry {0}").format(self.name),
-								"debit_in_account_currency": flt(amount["amount"]),
-								"account_currency": account_currency,
-								"project": item.project,
-							},
-							item=item,
-						)
+				account_currency = get_account_currency(item.expense_account)
+
+				gl_entries.append(
+					self.get_gl_dict(
+						{
+							"account": item.expense_account,
+							"against": _inv_dict["account"],
+							"cost_center": item.cost_center,
+							"debit": 0.0,
+							"credit": credit_amount * -1,
+							"remarks": _("Accounting Entry for LCV in Stock Entry {0}").format(self.name),
+							"debit_in_account_currency": flt(entry.amount),
+							"account_currency": account_currency,
+							"project": item.project,
+						},
+						item=item,
 					)
+				)
 
 	def update_work_order(self):
 		def _validate_work_order(pro_doc):
@@ -2448,6 +2574,8 @@ class StockEntry(StockController, SubcontractingInwardController):
 		if self.work_order:
 			pro_doc = frappe.get_doc("Work Order", self.work_order)
 			_validate_work_order(pro_doc)
+			if pro_doc.production_plan:
+				ProductionPlanWorkOrderQuantities(pro_doc.production_plan).lock_plan_row(pro_doc)
 
 			if self.fg_completed_qty:
 				if self.docstatus == 1:
@@ -2812,8 +2940,8 @@ class StockEntry(StockController, SubcontractingInwardController):
 				"s_warehouse": s_warehouse,
 				"t_warehouse": t_warehouse,
 				"is_finished_item": source_row.is_finished_item,
-				"type": source_row.type,
-				"is_legacy_scrap_item": source_row.is_legacy_scrap_item,
+				"secondary_item_type": source_row.secondary_item_type,
+				"valuation_type": source_row.valuation_type,
 				"bom_secondary_item": source_row.bom_secondary_item,
 				"bom_no": source_row.bom_no,
 				# batch and serial bundles built on submit
@@ -2884,8 +3012,8 @@ class StockEntry(StockController, SubcontractingInwardController):
 			SED.basic_rate,
 			SED.conversion_factor,
 			SED.is_finished_item,
-			SED.type,
-			SED.is_legacy_scrap_item,
+			SED.secondary_item_type,
+			SED.valuation_type,
 			SED.bom_secondary_item,
 			SED.batch_no,
 			SED.serial_no,
@@ -2914,6 +3042,9 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 	@frappe.whitelist()
 	def get_items(self):
+		if self.pick_list:
+			return
+
 		self.set("items", [])
 		self.validate_work_order()
 
@@ -2946,6 +3077,9 @@ class StockEntry(StockController, SubcontractingInwardController):
 						for item in item_dict.values():
 							item["to_warehouse"] = self.pro_doc.wip_warehouse
 					self.add_to_stock_entry_detail(item_dict)
+
+				elif self.purpose == "Manufacture" and self.is_rm_cost_from_consumption_entries():
+					pass
 
 				elif (
 					self.work_order
@@ -3176,8 +3310,8 @@ class StockEntry(StockController, SubcontractingInwardController):
 		if self.purpose in ["Manufacture", "Repack"]:
 			secondary_items_dict = self.get_secondary_items(self.fg_completed_qty)
 			for item in secondary_items_dict.values():
-				if self.pro_doc and item.type:
-					if self.pro_doc.scrap_warehouse and item.type == "Scrap":
+				if self.pro_doc and item.secondary_item_type:
+					if self.pro_doc.scrap_warehouse and item.secondary_item_type == "Scrap":
 						item["to_warehouse"] = self.pro_doc.scrap_warehouse
 
 				if item.process_loss_per:
@@ -3254,7 +3388,7 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 	def get_pending_process_loss_qty(self):
 		"""Loss this entry should still book: the job card's unbooked loss when the entry
-		belongs to one, else the largest operation loss on the work order (legacy flow)."""
+		belongs to one, else the unbooked portion of the largest operation loss on the work order."""
 		if self.job_card:
 			job_card = frappe.get_doc("Job Card", self.job_card)
 			return max(flt(job_card.process_loss_qty) - flt(job_card.get_consumed_process_loss()), 0)
@@ -3265,7 +3399,9 @@ class StockEntry(StockController, SubcontractingInwardController):
 				filters={"parent": self.work_order},
 				fields=[{"MAX": "process_loss_qty", "as": "process_loss_qty"}],
 			)
-			return flt(data[0].process_loss_qty) if data else 0
+			max_operation_loss = flt(data[0].process_loss_qty) if data else 0
+			booked_loss = flt(frappe.db.get_value("Work Order", self.work_order, "process_loss_qty"))
+			return max(max_operation_loss - booked_loss, 0)
 
 		return 0
 
@@ -3455,27 +3591,48 @@ class StockEntry(StockController, SubcontractingInwardController):
 			return
 
 		item_dict = {}
-		for row in self.get_secondary_items_from_job_card():
-			if row.stock_qty <= 0:
-				continue
-
-			item_dict[row.item_code] = frappe._dict(
+		rows = [row for row in self.get_secondary_items_from_job_card() if row.stock_qty > 0]
+		bom_rows = self.get_bom_secondary_item_details(rows)
+		for row in rows:
+			bom_row = bom_rows.get(row.bom_secondary_item, frappe._dict())
+			entry = frappe._dict(
 				{
+					"item_code": row.item_code,
 					"uom": row.stock_uom,
 					"from_warehouse": "",
 					"qty": row.stock_qty,
 					"conversion_factor": 1,
-					"type": row.type,
+					"secondary_item_type": row.secondary_item_type,
+					"valuation_type": bom_row.get("valuation_type"),
 					"item_name": row.item_name,
 					"description": row.description,
 					"bom_secondary_item": row.bom_secondary_item,
 				}
 			)
+			if entry.valuation_type == "Manual":
+				entry.manual_rate = (
+					flt(bom_row.cost) / flt(bom_row.stock_qty) if flt(bom_row.get("stock_qty")) else 0
+				)
+			item_dict[get_secondary_item_key(row)] = entry
 
 		for item in item_dict.values():
 			item.from_warehouse = ""
 
 		self.add_to_stock_entry_detail(item_dict)
+
+	def get_bom_secondary_item_details(self, secondary_items) -> dict:
+		names = [row.bom_secondary_item for row in secondary_items if row.bom_secondary_item]
+		if not names:
+			return {}
+
+		return {
+			row.name: row
+			for row in frappe.get_all(
+				"BOM Secondary Item",
+				filters={"name": ("in", names)},
+				fields=["name", "valuation_type", "cost", "stock_qty"],
+			)
+		}
 
 	def get_secondary_items_from_job_card(self):
 		if not hasattr(self, "pro_doc"):
@@ -3498,7 +3655,7 @@ class StockEntry(StockController, SubcontractingInwardController):
 				job_card_secondary_item.item_name,
 				job_card_secondary_item.description,
 				job_card_secondary_item.stock_uom,
-				job_card_secondary_item.type,
+				job_card_secondary_item.secondary_item_type,
 				job_card_secondary_item.bom_secondary_item,
 			)
 			.join(job_card_secondary_item)
@@ -3508,7 +3665,11 @@ class StockEntry(StockController, SubcontractingInwardController):
 				& (job_card.work_order == self.work_order)
 				& (job_card.docstatus == 1)
 			)
-			.groupby(job_card_secondary_item.item_code, job_card_secondary_item.type)
+			.groupby(
+				job_card_secondary_item.item_code,
+				job_card_secondary_item.secondary_item_type,
+				job_card_secondary_item.bom_secondary_item,
+			)
 			.orderby(job_card_secondary_item.idx)
 		)
 
@@ -3524,11 +3685,12 @@ class StockEntry(StockController, SubcontractingInwardController):
 
 		used_secondary_items = self.get_used_secondary_items()
 		for row in other:
-			row.stock_qty -= flt(used_secondary_items.get(row.item_code))
+			key = get_secondary_item_key(row)
+			row.stock_qty -= flt(used_secondary_items.get(key))
 			row.stock_qty = (row.stock_qty) * flt(self.fg_completed_qty) / flt(pending_qty)
 
-			if used_secondary_items.get(row.item_code):
-				used_secondary_items[row.item_code] -= row.stock_qty
+			if used_secondary_items.get(key):
+				used_secondary_items[key] -= row.stock_qty
 
 			if cint(frappe.get_cached_value("UOM", row.stock_uom, "must_be_whole_number")):
 				row.stock_qty = frappe.utils.ceil(row.stock_qty)
@@ -3547,17 +3709,26 @@ class StockEntry(StockController, SubcontractingInwardController):
 			frappe.qb.from_(StockEntry)
 			.inner_join(StockEntryDetail)
 			.on(StockEntryDetail.parent == StockEntry.name)
-			.select(StockEntryDetail.item_code, StockEntryDetail.qty)
+			.select(
+				StockEntryDetail.item_code,
+				StockEntryDetail.secondary_item_type,
+				StockEntryDetail.valuation_type,
+				StockEntryDetail.qty,
+				StockEntryDetail.bom_secondary_item,
+			)
 			.where(
 				(StockEntry.work_order == self.work_order)
-				& ((StockEntryDetail.type.isnotnull()) | (StockEntryDetail.is_legacy_scrap_item == 1))
+				& (
+					(StockEntryDetail.secondary_item_type.isnotnull())
+					| (Coalesce(StockEntryDetail.valuation_type, "") != "")
+				)
 				& (StockEntry.docstatus == 1)
 				& (StockEntry.purpose.isin(["Repack", "Manufacture"]))
 			)
 		).run(as_dict=1)
 
 		for row in data:
-			used_secondary_items[row.item_code] += row.qty
+			used_secondary_items[get_secondary_item_key(row)] += row.qty
 
 		return used_secondary_items
 
@@ -3854,8 +4025,8 @@ class StockEntry(StockController, SubcontractingInwardController):
 			if (
 				not self.is_return
 				and child_qty <= 0
-				and not item_row.get("type")
-				and not item_row.get("is_legacy_scrap_item")
+				and not item_row.get("secondary_item_type")
+				and not item_row.get("valuation_type")
 			):
 				if self.purpose not in ["Receive from Customer", "Send to Subcontractor"]:
 					continue
@@ -3878,8 +4049,11 @@ class StockEntry(StockController, SubcontractingInwardController):
 			se_child.sco_rm_detail = item_row.get("sco_rm_detail")
 			se_child.scio_detail = item_row.get("scio_detail")
 			se_child.sample_quantity = item_row.get("sample_quantity", 0)
-			se_child.type = item_row.get("type")
-			se_child.is_legacy_scrap_item = item_row.get("is_legacy")
+			se_child.secondary_item_type = item_row.get("secondary_item_type")
+			se_child.valuation_type = item_row.get("valuation_type")
+			if item_row.get("valuation_type") == "Manual":
+				se_child.set_basic_rate_manually = 1
+				se_child.basic_rate = flt(item_row.get("manual_rate"))
 			se_child.bom_secondary_item = item_row.get("name") or item_row.get("bom_secondary_item")
 
 			for field in [
@@ -4272,6 +4446,12 @@ def move_sample_to_retention_warehouse(company, items):
 
 @frappe.whitelist()
 def make_stock_in_entry(source_name, target_doc=None):
+	qty_precision = frappe.get_precision("Stock Entry Detail", "transfer_qty")
+
+	def get_remaining_transfer_qty(source_doc):
+		remaining_qty = flt(source_doc.transfer_qty) - flt(source_doc.transferred_qty)
+		return flt(remaining_qty, qty_precision)
+
 	def set_missing_values(source, target):
 		target.stock_entry_type = "Material Transfer"
 		target.set_missing_values()
@@ -4291,7 +4471,7 @@ def make_stock_in_entry(source_name, target_doc=None):
 				target_doc.t_warehouse = warehouse
 
 		target_doc.s_warehouse = source_doc.t_warehouse
-		target_doc.qty = source_doc.qty - source_doc.transferred_qty
+		target_doc.qty = get_remaining_transfer_qty(source_doc) / flt(source_doc.conversion_factor)
 
 	doclist = get_mapped_doc(
 		"Stock Entry",
@@ -4311,7 +4491,7 @@ def make_stock_in_entry(source_name, target_doc=None):
 					"batch_no": "batch_no",
 				},
 				"postprocess": update_item,
-				"condition": lambda doc: flt(doc.qty) - flt(doc.transferred_qty) > 0.00001,
+				"condition": lambda doc: get_remaining_transfer_qty(doc) > 0,
 			},
 		},
 		target_doc,
@@ -4514,6 +4694,10 @@ def get_warehouse_details(args):
 
 	args = frappe._dict(args)
 
+	# Restored explicitly: inherited from get_incoming_rate until it was split into a guarded wrapper
+	# and the unguarded _get_incoming_rate this now calls. `select` -- desk roles hold no Item read.
+	frappe.has_permission("Item", ptype="select", throw=True)
+
 	ret = {}
 	if args.warehouse and args.item_code:
 		args.update(
@@ -4524,7 +4708,7 @@ def get_warehouse_details(args):
 		)
 		ret = {
 			"actual_qty": get_previous_sle(args).get("qty_after_transaction") or 0,
-			"basic_rate": get_incoming_rate(args),
+			"basic_rate": _get_incoming_rate(args),
 		}
 	return ret
 

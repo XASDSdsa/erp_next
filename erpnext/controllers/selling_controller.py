@@ -12,7 +12,7 @@ from erpnext.controllers.sales_and_purchase_return import get_rate_for_return, i
 from erpnext.controllers.stock_controller import StockController
 from erpnext.stock.doctype.item.item import set_item_default
 from erpnext.stock.get_item_details import get_bin_details, get_conversion_factor
-from erpnext.stock.utils import get_combine_datetime, get_incoming_rate, get_valuation_method
+from erpnext.stock.utils import _get_incoming_rate, get_combine_datetime, get_valuation_method
 
 
 class SellingController(StockController):
@@ -43,18 +43,10 @@ class SellingController(StockController):
 				),
 			)
 
-		if (
-			self.get("company")
-			and (
-				default_selling_terms := frappe.get_value(
-					"Company", self.get("company"), "default_selling_terms"
-				)
-			)
-			and not self.get("tc_name")
-			and not self.get("terms")
-		):
-			self.tc_name = default_selling_terms
-			self.terms = frappe.get_value("Terms and Conditions", self.get("tc_name"), "terms")
+		if self.get("company") and not self.get("terms"):
+			if not self.get("tc_name"):
+				self.tc_name = frappe.get_value("Company", self.company, "default_selling_terms")
+			self.set_missing_terms()
 
 	def validate(self):
 		super().validate()
@@ -573,15 +565,15 @@ class SellingController(StockController):
 					reset_incoming_rate()
 
 				if (
-					not d.incoming_rate
+					(not d.incoming_rate or self.is_new())
+					and not is_standalone
 					or self.is_internal_transfer()
 					or (
 						get_valuation_method(d.item_code, self.company) == "Moving Average"
 						and self.get("is_return")
-						and not is_standalone
 					)
 				):
-					d.incoming_rate = get_incoming_rate(
+					d.incoming_rate = _get_incoming_rate(
 						{
 							"item_code": d.item_code,
 							"warehouse": d.warehouse,

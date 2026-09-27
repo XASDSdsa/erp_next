@@ -367,7 +367,7 @@ class IntegrationTestSubcontractingInwardOrder(ERPNextTestSuite):
 	def test_secondary_items_delivery(self):
 		new_bom = frappe.copy_doc(frappe.get_doc("BOM", "BOM-Basic FG Item-001"))
 		new_bom.secondary_items.append(
-			frappe.new_doc("BOM Secondary Item", item_code="Basic RM 2", qty=1, type="Scrap")
+			frappe.new_doc("BOM Secondary Item", item_code="Basic RM 2", qty=1, secondary_item_type="Scrap")
 		)
 		new_bom.submit()
 		sc_bom = frappe.get_doc("Subcontracting BOM", "SB-0001")
@@ -425,7 +425,7 @@ class IntegrationTestSubcontractingInwardOrder(ERPNextTestSuite):
 
 		scio.reload()
 		si = make_sales_invoice(so.name)
-		self.assertEqual(len(si.items), 1)
+		self.assertEqual(len(si.items), 0)
 
 	def test_extra_items_reservation_transfer(self):
 		so, scio = create_so_scio()

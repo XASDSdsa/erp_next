@@ -237,7 +237,9 @@ class Lead(SellingController, CRMNote):
 		return frappe.db.get_value("Quotation", {"party_name": self.name, "docstatus": 1, "status": "Lost"})
 
 	@frappe.whitelist()
-	def create_prospect_and_contact(self, data):
+	def create_prospect_and_contact(self, data: dict):
+		self.check_permission("write")
+
 		data = frappe._dict(data)
 		if data.create_contact:
 			self.create_contact()
@@ -482,6 +484,14 @@ def get_lead_details(lead, posting_date=None, company=None, doctype=None):
 def make_lead_from_communication(communication: str, ignore_communication_links: bool = False):
 	"""raise a issue from email"""
 
+	# Communication grants read to `All` only for the owner and carries a has_permission hook, so doc=
+	# is what decides access.
+	frappe.has_permission("Communication", doc=communication, throw=True)
+
+	# both paths end in a Lead: the insert path checks `create`, but the path reusing an existing Lead
+	# required nothing at all.
+	frappe.has_permission("Lead", ptype="create", throw=True)
+
 	doc = frappe.get_doc("Communication", communication)
 	lead_name = None
 	if doc.sender:
@@ -526,8 +536,11 @@ def get_lead_with_phone_number(number):
 	return lead
 
 
-@frappe.whitelist()
-def add_lead_to_prospect(lead, prospect):
+@frappe.whitelist(methods=["POST"])
+def add_lead_to_prospect(lead: str, prospect: str):
+	if lead:
+		frappe.has_permission("Lead", "read", lead, throw=True)
+
 	prospect = frappe.get_doc("Prospect", prospect)
 	prospect.append("leads", {"lead": lead})
 	prospect.save()

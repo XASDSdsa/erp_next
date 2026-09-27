@@ -10,7 +10,7 @@ from frappe import _
 from frappe.utils import cint, flt, get_link_to_form
 
 import erpnext
-from erpnext.assets.doctype.asset.asset import get_asset_value_after_depreciation
+from erpnext.assets.doctype.asset.asset import _get_asset_value_after_depreciation
 from erpnext.assets.doctype.asset.depreciation import (
 	depreciate_asset,
 	get_disposal_account_and_cost_center,
@@ -32,7 +32,7 @@ from erpnext.stock.get_item_details import (
 	get_item_warehouse_,
 )
 from erpnext.stock.stock_ledger import get_previous_sle
-from erpnext.stock.utils import get_incoming_rate
+from erpnext.stock.utils import _get_incoming_rate
 
 force_fields = [
 	"target_item_name",
@@ -158,6 +158,8 @@ class AssetCapitalization(StockController):
 				if d.meta.has_field(k) and (not d.get(k) or k in force_fields):
 					d.set(k, v)
 
+		self.split_valuation_rate_for_grouped_stock_items()
+
 		for d in self.asset_items:
 			args = self.as_dict()
 			args.update(d.as_dict())
@@ -178,6 +180,30 @@ class AssetCapitalization(StockController):
 			for k, v in service_item_details.items():
 				if d.meta.has_field(k) and (not d.get(k) or k in force_fields):
 					d.set(k, v)
+
+	def split_valuation_rate_for_grouped_stock_items(self):
+		groups = {}
+		for d in self.stock_items:
+			if d.item_code and d.warehouse and not (d.serial_no or d.batch_no or d.serial_and_batch_bundle):
+				groups.setdefault((d.item_code, d.warehouse), []).append(d)
+
+		for rows in groups.values():
+			if len(rows) < 2:
+				continue
+
+			cumulative_qty = 0.0
+			prev_cumulative_value = 0.0
+			for d in rows:
+				cumulative_qty += flt(d.stock_qty)
+				args = self.get_args_for_incoming_rate(d)
+				args["qty"] = -1 * cumulative_qty
+				cumulative_rate = flt(_get_incoming_rate(args, raise_error_if_no_rate=False))
+				cumulative_value = cumulative_rate * cumulative_qty
+
+				row_value = cumulative_value - prev_cumulative_value
+				d.valuation_rate = flt(row_value / d.stock_qty) if flt(d.stock_qty) else 0.0
+				d.amount = flt(flt(d.stock_qty) * d.valuation_rate, d.precision("amount"))
+				prev_cumulative_value = cumulative_value
 
 	def validate_target_item(self):
 		target_item = frappe.get_cached_doc("Item", self.target_item_code)
@@ -306,19 +332,25 @@ class AssetCapitalization(StockController):
 
 	@frappe.whitelist()
 	def set_warehouse_details(self):
+		self.check_permission("write")
+
 		for d in self.get("stock_items"):
 			if d.item_code and d.warehouse:
 				args = self.get_args_for_incoming_rate(d)
 				warehouse_details = get_warehouse_details(args)
 				d.update(warehouse_details)
 
+		self.split_valuation_rate_for_grouped_stock_items()
+
 	@frappe.whitelist()
 	def set_asset_values(self):
+		self.check_permission("write")
+
 		for d in self.get("asset_items"):
 			if d.asset:
 				finance_book = d.get("finance_book") or self.get("finance_book")
 				d.current_asset_value = flt(
-					get_asset_value_after_depreciation(d.asset, finance_book=finance_book)
+					_get_asset_value_after_depreciation(d.asset, finance_book=finance_book)
 				)
 				d.asset_value = get_value_after_depreciation_on_disposal_date(
 					d.asset, self.posting_date, finance_book=finance_book
@@ -612,8 +644,18 @@ class AssetCapitalization(StockController):
 			)
 
 
+def check_capitalization_access(company=None):
+	"""Every lookup in this file feeds the Asset Capitalization form, so that form is the boundary.
+
+	`company` is accepted so the call sites read the same as on develop, where it also narrows the
+	caller to their permitted companies. There is no Company Restriction on this branch.
+	"""
+	frappe.has_permission("Asset Capitalization", throw=True)
+
+
 @frappe.whitelist()
 def get_target_item_details(item_code: str | None = None, company: str | None = None) -> frappe._dict:
+	check_capitalization_access(company)
 	out = frappe._dict()
 
 	# Get Item Details
@@ -640,6 +682,7 @@ def get_target_item_details(item_code: str | None = None, company: str | None = 
 
 @frappe.whitelist()
 def get_target_asset_details(asset: str | None = None, company: str | None = None) -> frappe._dict:
+	check_capitalization_access(company)
 	out = frappe._dict()
 
 	# Get Asset Details
@@ -731,7 +774,7 @@ def get_warehouse_details(args):
 		frappe.has_permission("Stock Ledger Entry", throw=True)
 		out = {
 			"actual_qty": get_previous_sle(args).get("qty_after_transaction") or 0,
-			"valuation_rate": get_incoming_rate(args, raise_error_if_no_rate=False),
+			"valuation_rate": _get_incoming_rate(args, raise_error_if_no_rate=False),
 		}
 	return out
 
@@ -739,6 +782,14 @@ def get_warehouse_details(args):
 @frappe.whitelist()
 @erpnext.normalize_ctx_input(ItemDetailsCtx)
 def get_consumed_asset_details(ctx):
+	check_capitalization_access(ctx.get("company"))
+
+	# and the Asset the caller named: its depreciation values are returned through the unguarded
+	# _get_asset_value_after_depreciation. select-or-read, as in the asset.py wrapper.
+	if ctx.get("asset"):
+		ptype = "select" if frappe.only_has_select_perm("Asset") else "read"
+		frappe.has_permission("Asset", ptype, doc=ctx.get("asset"), throw=True)
+
 	out = frappe._dict()
 
 	asset_details = frappe._dict()
@@ -755,7 +806,7 @@ def get_consumed_asset_details(ctx):
 
 	if ctx.asset:
 		out.current_asset_value = flt(
-			get_asset_value_after_depreciation(ctx.asset, finance_book=ctx.finance_book)
+			_get_asset_value_after_depreciation(ctx.asset, finance_book=ctx.finance_book)
 		)
 		out.asset_value = get_value_after_depreciation_on_disposal_date(
 			ctx.asset, ctx.posting_date, finance_book=ctx.finance_book
@@ -785,6 +836,8 @@ def get_consumed_asset_details(ctx):
 @frappe.whitelist()
 @erpnext.normalize_ctx_input(ItemDetailsCtx)
 def get_service_item_details(ctx):
+	check_capitalization_access(ctx.get("company"))
+
 	out = frappe._dict()
 
 	item = frappe._dict()
@@ -809,6 +862,8 @@ def get_service_item_details(ctx):
 def get_items_tagged_to_wip_composite_asset(params):
 	if isinstance(params, str):
 		params = json.loads(params)
+
+	check_capitalization_access(params.get("company") if isinstance(params, dict | frappe._dict) else None)
 
 	fields = [
 		"item_code",

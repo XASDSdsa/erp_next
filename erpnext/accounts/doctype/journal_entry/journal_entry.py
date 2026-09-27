@@ -960,12 +960,14 @@ class JournalEntry(AccountsController):
 			if d.debit and d.credit:
 				frappe.throw(_("You cannot credit and debit same account at the same time"))
 
-			self.total_debit = flt(self.total_debit) + flt(d.debit, d.precision("debit"))
-			self.total_credit = flt(self.total_credit) + flt(d.credit, d.precision("credit"))
+			self.total_debit = flt(
+				self.total_debit + flt(d.debit, d.precision("debit")), self.precision("total_debit")
+			)
+			self.total_credit = flt(
+				self.total_credit + flt(d.credit, d.precision("credit")), self.precision("total_credit")
+			)
 
-		self.difference = flt(self.total_debit, self.precision("total_debit")) - flt(
-			self.total_credit, self.precision("total_credit")
-		)
+		self.difference = flt(self.total_debit - self.total_credit, self.precision("difference"))
 
 	def validate_multi_currency(self):
 		alternate_currency = []
@@ -1354,6 +1356,10 @@ def get_default_bank_cash_account(
 ):
 	from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 
+	# `select`, not `read`: this also runs server-side from get_payment_entry, and Auditor/HR User/Desk
+	# User hold only the select row on Company. doc= brings User Permissions to bear.
+	frappe.has_permission("Company", ptype="select", doc=company, throw=True)
+
 	if mode_of_payment:
 		account = get_bank_cash_account(mode_of_payment, company).get("account")
 
@@ -1382,6 +1388,10 @@ def get_default_bank_cash_account(
 					account = account_list[0].name
 
 	if account:
+		# `fetch_balance` is caller supplied, so authorise the account here rather than relying on
+		# get_balance_on(), which only checks on the branch that reads a balance.
+		frappe.has_permission("Account", doc=account, throw=True)
+
 		account_details = frappe.get_cached_value(
 			"Account", account, ["account_currency", "account_type"], as_dict=1
 		)
@@ -1402,6 +1412,7 @@ def get_payment_entry_against_order(
 	dt, dn, amount=None, debit_in_account_currency=None, journal_entry=False, bank_account=None
 ):
 	ref_doc = frappe.get_doc(dt, dn)
+	ref_doc.check_permission()
 
 	if flt(ref_doc.per_billed, 2) > 0:
 		frappe.throw(_("Can only make payment against unbilled {0}").format(dt))
@@ -1447,6 +1458,8 @@ def get_payment_entry_against_invoice(
 	dt, dn, amount=None, debit_in_account_currency=None, journal_entry=False, bank_account=None
 ):
 	ref_doc = frappe.get_doc(dt, dn)
+	ref_doc.check_permission()
+
 	if dt == "Sales Invoice":
 		party_type = "Customer"
 		party_account = get_party_account_based_on_invoice_discounting(dn) or ref_doc.debit_to
@@ -1482,6 +1495,8 @@ def get_payment_entry_against_invoice(
 
 
 def get_payment_entry(ref_doc, args):
+	frappe.has_permission("Journal Entry", ptype="create", throw=True)
+
 	cost_center = ref_doc.get("cost_center") or frappe.get_cached_value(
 		"Company", ref_doc.company, "cost_center"
 	)
@@ -1561,30 +1576,39 @@ def get_against_jv(doctype, txt, searchfield, start, page_len, filters):
 	if not frappe.db.has_column("Journal Entry", searchfield):
 		return []
 
-	JournalEntry = frappe.qb.DocType("Journal Entry")
-	JournalEntryAccount = frappe.qb.DocType("Journal Entry Account")
+	account = filters.get("account")
+	party = filters.get("party")
 
-	query = (
-		frappe.qb.from_(JournalEntry)
-		.join(JournalEntryAccount)
-		.on(JournalEntryAccount.parent == JournalEntry.name)
-		.select(JournalEntry.name, JournalEntry.posting_date, JournalEntry.remark)
-		.where(JournalEntryAccount.account == filters.get("account"))
-		.where(JournalEntryAccount.reference_type.isnull() | (JournalEntryAccount.reference_type == ""))
-		.where(JournalEntry.docstatus == 1)
-		.where(JournalEntry[searchfield].like(f"%{txt}%"))
-		.orderby(JournalEntry.name, order=frappe.qb.desc)
-		.limit(page_len)
-		.offset(start)
+	# each names one value: a list would be read as a filter operator and widen the search.
+	for value in (account, party):
+		if value and not isinstance(value, str):
+			frappe.throw(_("Invalid filter"), frappe.PermissionError)
+
+	# get_list applies the permission query conditions; the child-table filter resolves the check to `read`
+	je_filters = [
+		["docstatus", "=", 1],
+		[searchfield, "like", f"%{txt}%"],
+		["Journal Entry Account", "account", "=", account],
+		["Journal Entry Account", "reference_type", "is", "not set"],
+	]
+	je_filters.append(
+		["Journal Entry Account", "party", "=", party]
+		if party
+		else ["Journal Entry Account", "party", "is", "not set"]
 	)
 
-	party = filters.get("party")
-	if party:
-		query = query.where(JournalEntryAccount.party == party)
-	else:
-		query = query.where(JournalEntryAccount.party.isnull() | (JournalEntryAccount.party == ""))
-
-	return query.run()
+	return frappe.get_list(
+		"Journal Entry",
+		filters=je_filters,
+		fields=["name", "posting_date", "remark"],
+		order_by="name desc",
+		limit_start=start,
+		limit_page_length=page_len,
+		as_list=True,
+		# one row per entry, not per matching account row. group_by rather than distinct: frappe
+		# drops ORDER BY from a distinct query on postgres, which would lose the ordering above.
+		group_by="name",
+	)
 
 
 @frappe.whitelist()
@@ -1777,6 +1801,20 @@ def make_inter_company_journal_entry(name, voucher_type, company):
 
 @frappe.whitelist()
 def make_reverse_journal_entry(source_name, target_doc=None):
+	# `get_mapped_doc` checks this as well, but the guards below disclose which entry
+	# reverses which, so read access has to be settled before they run
+	if not frappe.has_permission("Journal Entry", doc=source_name):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+	reversal_of = frappe.db.get_value("Journal Entry", source_name, "reversal_of")
+	if reversal_of:
+		frappe.throw(
+			_("{0} is already a Reverse Journal Entry of {1}. Cancel it instead of reversing it.").format(
+				get_link_to_form("Journal Entry", source_name),
+				get_link_to_form("Journal Entry", reversal_of),
+			)
+		)
+
 	existing_reverse = frappe.db.exists("Journal Entry", {"reversal_of": source_name, "docstatus": 1})
 	if existing_reverse:
 		frappe.throw(
@@ -1789,6 +1827,10 @@ def make_reverse_journal_entry(source_name, target_doc=None):
 
 	def post_process(source, target):
 		target.reversal_of = source.name
+		target.naming_series = source.naming_series
+		if source.voucher_type == "Bank Entry":
+			target.cheque_no = source.cheque_no
+			target.cheque_date = source.cheque_date
 
 	doclist = get_mapped_doc(
 		"Journal Entry",

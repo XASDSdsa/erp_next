@@ -72,6 +72,7 @@ class AccountsSettings(Document):
 		default_ageing_range: DF.Data | None
 		delete_linked_ledger_entries: DF.Check
 		determine_address_tax_category_from: DF.Literal["Billing Address", "Shipping Address"]
+		disable_include_dimensions: DF.Check
 		enable_accounting_dimensions: DF.Check
 		enable_common_party_accounting: DF.Check
 		enable_discounts_and_margin: DF.Check
@@ -218,6 +219,13 @@ class AccountsSettings(Document):
 		doctypes += get_child_docs(doctypes)
 
 		set_allow_on_submit_for_dimension_fields(doctypes)
+
+
+@frappe.whitelist(methods=["POST"])
+def get_posting_date_confirmation() -> int:
+	return cint(
+		frappe.db.get_single_value("Accounts Settings", "confirm_before_resetting_posting_date", cache=False)
+	)
 
 
 def toggle_accounting_dimension_sections(hide):

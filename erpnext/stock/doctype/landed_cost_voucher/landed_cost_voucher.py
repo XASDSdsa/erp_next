@@ -64,7 +64,7 @@ class LandedCostVoucher(Document):
 					item.item_code = d.item_code
 					item.description = d.description
 					item.qty = d.qty
-					item.rate = d.get("base_rate") or d.get("rate")
+					item.rate = d.base_rate
 					item.cost_center = d.cost_center or erpnext.get_default_cost_center(self.company)
 					item.amount = d.base_amount
 					item.receipt_document_type = pr.receipt_document_type
@@ -88,6 +88,7 @@ class LandedCostVoucher(Document):
 
 		self.set_applicable_charges_on_item()
 		self.set_total_vendor_invoices_cost()
+		self.validate_mandatory_dimensions()
 
 	def set_total_vendor_invoices_cost(self):
 		self.total_vendor_invoices_cost = 0.0
@@ -196,27 +197,115 @@ class LandedCostVoucher(Document):
 					exc=IncorrectCompanyValidationError,
 				)
 
+	def validate_mandatory_dimensions(self):
+		from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
+			get_accounting_dimensions,
+			get_checks_for_pl_and_bs_accounts,
+		)
+		from erpnext.accounts.doctype.accounting_dimension_filter.accounting_dimension_filter import (
+			get_dimension_filter_map,
+		)
+
+		if not is_perpetual_inventory_enabled(self.company):
+			return
+
+		company_checks = [
+			check
+			for check in get_checks_for_pl_and_bs_accounts()
+			if check.company == self.company and (check.mandatory_for_pl or check.mandatory_for_bs)
+		]
+		dimension_filter_map = get_dimension_filter_map()
+
+		if not company_checks and not dimension_filter_map:
+			return
+
+		labels = {d.fieldname: d.label for d in get_accounting_dimensions(as_list=False)}
+		receipts = {}
+
+		for tax in self.get("taxes"):
+			if not tax.expense_account:
+				continue
+
+			report_type = frappe.get_cached_value("Account", tax.expense_account, "report_type")
+
+			mandatory = {}
+			for check in company_checks:
+				is_mandatory = (
+					check.mandatory_for_pl if report_type == "Profit and Loss" else check.mandatory_for_bs
+				)
+				if is_mandatory:
+					mandatory[check.fieldname] = check.label
+
+			for (fieldname, account), dimension_filter in dimension_filter_map.items():
+				if account == tax.expense_account and dimension_filter.get("is_mandatory"):
+					mandatory.setdefault(fieldname, labels.get(fieldname) or frappe.unscrub(fieldname))
+
+			for fieldname, label in mandatory.items():
+				if tax.get(fieldname):
+					continue
+
+				for item in self.get("items"):
+					if self.get_receipt_dimension(receipts, item, fieldname):
+						continue
+
+					frappe.throw(
+						_(
+							"Row {0}: Accounting Dimension {1} is mandatory for account {2}."
+							" Set it on this Taxes and Charges row, or on Item Row {3} ({4})."
+						).format(
+							tax.idx,
+							frappe.bold(label),
+							frappe.bold(tax.expense_account),
+							item.idx,
+							frappe.bold(item.item_code),
+						),
+						title=_("Missing Accounting Dimension"),
+					)
+
+	def get_receipt_dimension(self, receipts, item, fieldname):
+		if item.get(fieldname):
+			return item.get(fieldname)
+
+		key = (item.receipt_document_type, item.receipt_document)
+		if key not in receipts:
+			receipts[key] = frappe.get_doc(*key) if item.receipt_document else None
+
+		receipt = receipts[key]
+		if not receipt:
+			return None
+
+		row_fieldname = "stock_entry_item" if receipt.doctype == "Stock Entry" else "purchase_receipt_item"
+		receipt_row_name = item.get(row_fieldname)
+
+		for row in receipt.get("items") or []:
+			if row.name == receipt_row_name and row.get(fieldname):
+				return row.get(fieldname)
+
+		return receipt.get(fieldname)
+
 	def set_total_taxes_and_charges(self):
 		self.total_taxes_and_charges = sum(flt(d.base_amount) for d in self.get("taxes"))
 
 	def set_applicable_charges_on_item(self):
 		if self.get("taxes") and self.distribute_charges_based_on != "Distribute Manually":
-			total_item_cost = 0.0
+			items = self.get("items")
 			total_charges = 0.0
 			item_count = 0
 			based_on_field = frappe.scrub(self.distribute_charges_based_on)
 
-			for item in self.get("items"):
-				total_item_cost += item.get(based_on_field)
+			total_item_cost = sum(flt(item.get(based_on_field)) for item in items)
+			if items:
+				total_item_cost = flt(total_item_cost, items[0].precision(based_on_field))
 
-			for item in self.get("items"):
-				if not total_item_cost and not item.get(based_on_field):
-					frappe.throw(
-						_(
-							"It's not possible to distribute charges equally when total amount is zero, please set 'Distribute Charges Based On' as 'Quantity'"
-						)
+			if not total_item_cost:
+				frappe.throw(
+					_("Total {0} of all items is zero. Set 'Distribute Charges Based On' to {1}.").format(
+						self.distribute_charges_based_on,
+						_("Qty") if based_on_field == "amount" else _("Amount"),
 					)
+				)
 
+			for item in self.get("items"):
 				item.applicable_charges = flt(
 					flt(item.get(based_on_field))
 					* (flt(self.total_taxes_and_charges) / flt(total_item_cost)),
@@ -337,7 +426,7 @@ class LandedCostVoucher(Document):
 			# update stock & gl entries for cancelled state of PR
 			doc.docstatus = 2
 			doc.update_stock_ledger(allow_negative_stock=True, via_landed_cost_voucher=True)
-			doc.make_gl_entries_on_cancel()
+			doc.make_gl_entries_on_cancel(from_repost=True)
 
 			# update stock & gl entries for submit state of PR
 			doc.docstatus = 1
@@ -461,8 +550,8 @@ def get_pr_items(purchase_receipt):
 		query = query.where(pr_item.is_finished_item == 1)
 	else:
 		query = query.select(
-			pr_item.base_rate,
-			pr_item.base_amount,
+			pr_item.base_net_rate.as_("base_rate"),
+			pr_item.base_net_amount.as_("base_amount"),
 			pr_item.is_fixed_asset,
 		)
 
@@ -519,3 +608,25 @@ def get_vendor_invoice_query(filters):
 		query = query.where(doctype.name == filters.get("name"))
 
 	return query
+
+
+def get_lcv_dimension_fields():
+	from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
+		get_accounting_dimensions,
+	)
+
+	return ["cost_center", "project", *get_accounting_dimensions()]
+
+
+def get_row_dimensions(tax_row, lcv_item, dimension_fields):
+	return frappe._dict(
+		{field: (tax_row.get(field) or lcv_item.get(field) or None) for field in dimension_fields}
+	)
+
+
+def get_custom_dimension_overrides(entry):
+	return {
+		dimension: value
+		for dimension, value in (entry.dimensions or {}).items()
+		if value and dimension not in ("cost_center", "project")
+	}
