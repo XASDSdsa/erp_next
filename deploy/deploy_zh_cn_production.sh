@@ -17,6 +17,7 @@ WAIT_SECONDS="${WAIT_SECONDS:-2}"
 BACKUP_DIR="${BACKUP_DIR:-build/production-backups/$(date +%Y%m%d-%H%M%S)}"
 RELEASE_NAME="${RELEASE_NAME:-$(date +%Y%m%d-%H%M%S)}"
 CANONICAL_BACKUP_DIR="${CANONICAL_BACKUP_DIR:-/home/frappe/frappe-bench/sites/${SITE}/private/deployment-backups/${RELEASE_NAME}}"
+MIGRATION_MARKER="${MIGRATION_MARKER:-${BACKUP_DIR}/migration-attempted}"
 
 SERVICES=(backend websocket frontend queue-long queue-short scheduler)
 EXPECTED_TRANSLATIONS=(
@@ -42,6 +43,7 @@ PREVIOUS_IMAGE_ID=""
 TARGET_IMAGE_ID=""
 MAINTENANCE_ENABLED=0
 SERVICES_SWITCHED=0
+MIGRATION_ATTEMPTED=0
 
 cleanup_files() {
 	rm -f \
@@ -161,6 +163,23 @@ set_maintenance_off() {
 	return 1
 }
 
+set_maintenance_on() {
+	if docker exec "$BACKEND" bench --site "$SITE" set-maintenance-mode on; then
+		MAINTENANCE_ENABLED=1
+		return 0
+	fi
+	# The backend may be stopped after a partial Compose switch. A one-off
+	# container can still update the shared sites volume without public traffic.
+	if ZH_IMAGE="${PREVIOUS_IMAGE:-$ZH_IMAGE}" docker compose \
+		-p "$PROJECT" -f "$BASE_COMPOSE" -f "$OVERRIDE" \
+		run --rm --no-deps -T --pull never --entrypoint bench backend \
+		--site "$SITE" set-maintenance-mode on; then
+		MAINTENANCE_ENABLED=1
+		return 0
+	fi
+	return 1
+}
+
 rollback() {
 	local exit_code="$1"
 	local rollback_ok=1
@@ -169,12 +188,19 @@ rollback() {
 
 	echo "ZH_CN_DEPLOY_FAILED_ROLLING_BACK"
 
+	# A migration can commit schema/data changes before a later command fails.
+	# Never expose an old image against an unknown database state. Leave the
+	# candidate in maintenance mode and let the root-owned entrypoint record
+	# recovery_required for an operator-led database/image recovery.
+	if [[ "$MIGRATION_ATTEMPTED" -eq 1 ]]; then
+		set_maintenance_on || echo "MIGRATION_RECOVERY_MAINTENANCE_UNCONFIRMED" >&2
+		echo "MIGRATION_RECOVERY_REQUIRED marker=$MIGRATION_MARKER" >&2
+		cleanup_files
+		exit "$exit_code"
+	fi
+
 	if [[ "$SERVICES_SWITCHED" -eq 1 && -n "$PREVIOUS_IMAGE" ]]; then
-		if docker exec "$BACKEND" bench --site "$SITE" set-maintenance-mode on; then
-			MAINTENANCE_ENABLED=1
-		else
-			rollback_ok=0
-		fi
+		set_maintenance_on || rollback_ok=0
 
 		ZH_IMAGE="$PREVIOUS_IMAGE" docker compose \
 			-p "$PROJECT" \
@@ -198,16 +224,19 @@ rollback() {
 		done
 	fi
 
-	if [[ "$MAINTENANCE_ENABLED" -eq 1 ]]; then
+	if [[ "$rollback_ok" -eq 1 && "$MAINTENANCE_ENABLED" -eq 1 ]]; then
 		set_maintenance_off || rollback_ok=0
 	fi
 
-	wait_for_https || rollback_ok=0
+	if [[ "$rollback_ok" -eq 1 ]]; then
+		wait_for_https || rollback_ok=0
+	fi
 	cleanup_files
 
 	if [[ "$rollback_ok" -eq 1 ]]; then
 		echo "ROLLBACK_FINISHED image=${PREVIOUS_IMAGE:-unchanged}"
 	else
+		set_maintenance_on || echo "ROLLBACK_MAINTENANCE_UNCONFIRMED" >&2
 		echo "ROLLBACK_INCOMPLETE_MANUAL_CHECK_REQUIRED image=${PREVIOUS_IMAGE:-unknown}" >&2
 	fi
 
@@ -322,10 +351,18 @@ ZH_IMAGE="$ZH_IMAGE" docker compose \
 
 wait_for_backend
 
+# The candidate image may contain DocType, patch, or schema changes. Record the
+# attempt before invoking migrate: even a failed migration may have committed
+# part of its database work, so an image-only rollback is unsafe.
+install -d -m 0700 "$(dirname "$MIGRATION_MARKER")"
+MIGRATION_ATTEMPTED=1
+printf 'site=%q\nrelease=%q\nstarted_at_utc=%q\n' "$SITE" "$RELEASE_NAME" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$MIGRATION_MARKER"
+
 # The candidate image may contain DocType, patch, or schema changes. Run the
 # migration while the new backend is in maintenance mode, before clearing
 # caches or exposing the release to public traffic. A failure exits this
-# script and the trap restores the previous application image.
+# script and leaves the release in maintenance for the root-owned entrypoint
+# to perform a guarded recovery.
 docker exec "$BACKEND" bench --site "$SITE" migrate
 echo "SITE_MIGRATION_OK site=$SITE image=$ZH_IMAGE"
 
