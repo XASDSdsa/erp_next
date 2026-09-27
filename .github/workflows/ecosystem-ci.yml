@@ -16,14 +16,15 @@ concurrency:
 
 jobs:
   ecosystem:
-    uses: XASDSdsa/frappe-ecosystem-cicd/.github/workflows/frappe-ci.yml@v1
+    uses: XASDSdsa/frappe-ecosystem-cicd/.github/workflows/frappe-ci.yml@v2
     with:
       python-version: "3.14"
       node-version: "24"
       test-command: python -m compileall -q erpnext
 
   notify-central-release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/version-16' && vars.CENTRAL_RELEASE_ENABLED == 'true'
+    needs: ecosystem
+    if: success() && github.event_name == 'push' && github.ref == 'refs/heads/version-16' && vars.CENTRAL_RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch unified release build
