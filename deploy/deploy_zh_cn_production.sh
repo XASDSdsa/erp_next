@@ -322,6 +322,13 @@ ZH_IMAGE="$ZH_IMAGE" docker compose \
 
 wait_for_backend
 
+# The candidate image may contain DocType, patch, or schema changes. Run the
+# migration while the new backend is in maintenance mode, before clearing
+# caches or exposing the release to public traffic. A failure exits this
+# script and the trap restores the previous application image.
+docker exec "$BACKEND" bench --site "$SITE" migrate
+echo "SITE_MIGRATION_OK site=$SITE image=$ZH_IMAGE"
+
 for service in "${SERVICES[@]}"; do
 	container="${PROJECT}-${service}-1"
 	state="$(docker inspect "$container" --format '{{.Config.Image}} {{.Image}} {{.State.Running}} {{.RestartCount}}')"
