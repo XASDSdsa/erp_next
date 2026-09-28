@@ -15,6 +15,8 @@ PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://${SITE}}"
 WAIT_ATTEMPTS="${WAIT_ATTEMPTS:-60}"
 WAIT_SECONDS="${WAIT_SECONDS:-2}"
 BACKUP_DIR="${BACKUP_DIR:-build/production-backups/$(date +%Y%m%d-%H%M%S)}"
+CANONICAL_BACKUP_DIR="${CANONICAL_BACKUP_DIR:-/home/frappe/frappe-bench/sites/${SITE}/private/deployment-backups/$(date +%Y%m%d-%H%M%S)}"
+MIGRATION_MARKER="${MIGRATION_MARKER:-${BACKUP_DIR}/migration-attempted}"
 
 SERVICES=(backend websocket frontend queue-long queue-short scheduler)
 EXPECTED_TRANSLATIONS=(
@@ -40,6 +42,7 @@ PREVIOUS_IMAGE_ID=""
 TARGET_IMAGE_ID=""
 MAINTENANCE_ENABLED=0
 SERVICES_SWITCHED=0
+MIGRATION_ATTEMPTED=0
 
 cleanup_files() {
 	rm -f \
@@ -104,6 +107,26 @@ create_verified_backup() {
 		"$BACKUP_DIR/"
 	chmod -R go-rwx "$BACKUP_DIR"
 
+	docker exec "$BACKEND" env \
+		BACKUP_STARTED_AT="$backup_started_at" \
+		CANONICAL_BACKUP_DIR="$CANONICAL_BACKUP_DIR" \
+		SITE="$SITE" \
+		python3 -c '
+import os
+import shutil
+from pathlib import Path
+
+source = Path("/home/frappe/frappe-bench/sites") / os.environ["SITE"] / "private" / "backups"
+destination = Path(os.environ["CANONICAL_BACKUP_DIR"])
+started_at = int(os.environ["BACKUP_STARTED_AT"])
+destination.mkdir(parents=True, exist_ok=False)
+destination.chmod(0o700)
+for path in source.iterdir():
+    if path.is_file() and path.stat().st_size > 0 and path.stat().st_mtime >= started_at - 2:
+        target = destination / path.name
+        shutil.copy2(path, target)
+        target.chmod(0o600)
+'
 	BACKUP_DIR="$BACKUP_DIR" BACKUP_STARTED_AT="$backup_started_at" python3 -c '
 import os
 from pathlib import Path
@@ -125,6 +148,22 @@ missing = [label for label, matches in checks.items() if not any(matches(path.na
 assert not missing, f"Current production backup is incomplete: {missing}"
 print(f"PRODUCTION_BACKUP_VERIFIED path={backup_dir} files={len(files)}")
 '
+	docker exec "$BACKEND" env CANONICAL_BACKUP_DIR="$CANONICAL_BACKUP_DIR" python3 -c '
+import os
+from pathlib import Path
+
+backup_dir = Path(os.environ["CANONICAL_BACKUP_DIR"])
+files = [path for path in backup_dir.iterdir() if path.is_file() and path.stat().st_size > 0]
+checks = {
+    "site configuration": lambda name: name.endswith("-site_config_backup.json"),
+    "database": lambda name: name.endswith("-database.sql.gz"),
+    "public files": lambda name: name.endswith("-files.tgz") and not name.endswith("-private-files.tgz"),
+    "private files": lambda name: name.endswith("-private-files.tgz"),
+}
+missing = [label for label, matches in checks.items() if not any(matches(path.name) for path in files)]
+assert not missing, f"Canonical production backup is incomplete: {missing}"
+print(f"PRODUCTION_BACKUP_CANONICAL_VERIFIED path={backup_dir} files={len(files)}")
+'
 }
 
 set_maintenance_off() {
@@ -141,6 +180,12 @@ rollback() {
 	local rollback_ok=1
 	trap - EXIT INT TERM
 	set +e
+
+	if [[ "$MIGRATION_ATTEMPTED" -eq 1 ]]; then
+		echo "DEPLOYMENT_FAILED_AFTER_MIGRATION_MAINTENANCE_REQUIRED marker=$MIGRATION_MARKER backup=$CANONICAL_BACKUP_DIR" >&2
+		cleanup_files
+		exit "$exit_code"
+	fi
 
 	echo "ZH_CN_DEPLOY_FAILED_ROLLING_BACK"
 
@@ -306,6 +351,14 @@ for service in "${SERVICES[@]}"; do
 		exit 1
 	fi
 done
+
+install -d -m 0700 "$(dirname "$MIGRATION_MARKER")"
+printf 'candidate_image=%s\nstarted_at_utc=%s\n' "$ZH_IMAGE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$MIGRATION_MARKER"
+chmod 600 "$MIGRATION_MARKER"
+# From this point an image-only rollback may be schema-incompatible. Keep
+# maintenance enabled on failure and require restore or forward recovery.
+MIGRATION_ATTEMPTED=1
+docker exec "$BACKEND" bench --site "$SITE" migrate
 
 docker exec "$BACKEND" \
 	/home/frappe/frappe-bench/env/bin/python \
