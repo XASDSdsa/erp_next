@@ -18,3 +18,4 @@ def select_linked_shipment_row(rows: Iterable, *, include_cancelled: bool = Fals
 	active = [row for row in rows if int(row.get("docstatus") or 0) != 2]
 	candidates = active or rows
 	booked = [row for row in candidates if row.get("shipment_id") or row.get("awb_number")]
+	return (booked or candidates)[0]
