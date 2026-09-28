@@ -43,6 +43,7 @@ doctype_js = {
 	"Contact": "public/js/contact.js",
 }
 doctype_list_js = {
+	"Shipment": "public/js/shipment_list_contract_v2.js",
 	"Code List": [
 		"edi/doctype/code_list/code_list_import.js",
 	],
