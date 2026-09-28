@@ -61,6 +61,10 @@
   "awb_number",
   "tracking_status",
   "tracking_status_info",
+  "transport_status_display",
+  "freight_status_display",
+  "interception_status_display",
+  "label_replacement_display",
   "amended_from"
  ],
  "fields": [
@@ -394,6 +398,46 @@
    "fieldname": "tracking_status_info",
    "fieldtype": "Data",
    "label": "Tracking Status Info",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "transport_status_display",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "运输状态",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "freight_status_display",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "运费",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "interception_status_display",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "拦截状态",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "label_replacement_display",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "面单替换",
    "no_copy": 1,
    "print_hide": 1,
    "read_only": 1

@@ -38,6 +38,9 @@ class Shipment(Document):
 		delivery_to: DF.Data | None
 		delivery_to_type: DF.Literal["Company", "Customer", "Supplier"]
 		description_of_content: DF.SmallText
+		freight_status_display: DF.Data | None
+		interception_status_display: DF.Data | None
+		label_replacement_display: DF.Data | None
 		incoterm: DF.Link | None
 		pallets: DF.Literal["No", "Yes"]
 		parcel_template: DF.Link | None
@@ -65,6 +68,7 @@ class Shipment(Document):
 		status: DF.Literal["Draft", "Submitted", "Booked", "Cancelled", "Completed"]
 		total_weight: DF.Float
 		tracking_status: DF.Literal["", "In Progress", "Delivered", "Returned", "Lost"]
+		transport_status_display: DF.Data | None
 		tracking_status_info: DF.Data | None
 		tracking_url: DF.SmallText | None
 		value_of_goods: DF.Currency
@@ -78,6 +82,7 @@ class Shipment(Document):
 		self.validate_pickup_time()
 		self.set_value_of_goods()
 		self.set_total_weight()
+		self.set_list_display_fields()
 		if self.docstatus == 0:
 			self.status = "Draft"
 
@@ -90,6 +95,19 @@ class Shipment(Document):
 
 	def on_cancel(self):
 		self.db_set("status", "Cancelled")
+
+	def set_list_display_fields(self):
+		transport_labels = {
+			"In Progress": "运输中",
+			"Delivered": "已送达",
+			"Returned": "已退回",
+			"Lost": "已丢失",
+		}
+		self.transport_status_display = transport_labels.get(self.tracking_status, self.tracking_status or "")
+		self.freight_status_display = self.freight_status_display or ""
+		self.interception_status_display = self.interception_status_display or ""
+		waybill = self.shipment_id or self.awb_number or ""
+		self.label_replacement_display = f"当前 {waybill}" if waybill else ""
 
 	def validate_weight(self):
 		for parcel in self.shipment_parcel:
