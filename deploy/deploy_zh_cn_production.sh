@@ -15,8 +15,7 @@ PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://${SITE}}"
 WAIT_ATTEMPTS="${WAIT_ATTEMPTS:-60}"
 WAIT_SECONDS="${WAIT_SECONDS:-2}"
 BACKUP_DIR="${BACKUP_DIR:-build/production-backups/$(date +%Y%m%d-%H%M%S)}"
-RELEASE_NAME="${RELEASE_NAME:-$(date +%Y%m%d-%H%M%S)}"
-CANONICAL_BACKUP_DIR="${CANONICAL_BACKUP_DIR:-/home/frappe/frappe-bench/sites/${SITE}/private/deployment-backups/${RELEASE_NAME}}"
+CANONICAL_BACKUP_DIR="${CANONICAL_BACKUP_DIR:-/home/frappe/frappe-bench/sites/${SITE}/private/deployment-backups/$(date +%Y%m%d-%H%M%S)}"
 MIGRATION_MARKER="${MIGRATION_MARKER:-${BACKUP_DIR}/migration-attempted}"
 
 SERVICES=(backend websocket frontend queue-long queue-short scheduler)
@@ -108,6 +107,26 @@ create_verified_backup() {
 		"$BACKUP_DIR/"
 	chmod -R go-rwx "$BACKUP_DIR"
 
+	docker exec "$BACKEND" env \
+		BACKUP_STARTED_AT="$backup_started_at" \
+		CANONICAL_BACKUP_DIR="$CANONICAL_BACKUP_DIR" \
+		SITE="$SITE" \
+		python3 -c '
+import os
+import shutil
+from pathlib import Path
+
+source = Path("/home/frappe/frappe-bench/sites") / os.environ["SITE"] / "private" / "backups"
+destination = Path(os.environ["CANONICAL_BACKUP_DIR"])
+started_at = int(os.environ["BACKUP_STARTED_AT"])
+destination.mkdir(parents=True, exist_ok=False)
+destination.chmod(0o700)
+for path in source.iterdir():
+    if path.is_file() and path.stat().st_size > 0 and path.stat().st_mtime >= started_at - 2:
+        target = destination / path.name
+        shutil.copy2(path, target)
+        target.chmod(0o600)
+'
 	BACKUP_DIR="$BACKUP_DIR" BACKUP_STARTED_AT="$backup_started_at" python3 -c '
 import os
 from pathlib import Path
@@ -129,29 +148,22 @@ missing = [label for label, matches in checks.items() if not any(matches(path.na
 assert not missing, f"Current production backup is incomplete: {missing}"
 print(f"PRODUCTION_BACKUP_VERIFIED path={backup_dir} files={len(files)}")
 '
-	docker exec "$BACKEND" install -d -m 0700 "$CANONICAL_BACKUP_DIR"
-	docker exec "$BACKEND" cp -a \
-		/home/frappe/frappe-bench/sites/"$SITE"/private/backups/. \
-		"$CANONICAL_BACKUP_DIR/"
-	docker exec "$BACKEND" sh -c '
-set -eu
-backup_dir="$1"
-chmod 700 "$backup_dir"
-find "$backup_dir" -type d -exec chmod 700 {} +
-find "$backup_dir" -type f -exec chmod 600 {} +
-' -- "$CANONICAL_BACKUP_DIR"
-	docker exec "$BACKEND" sh -c '
-set -eu
-backup_dir="$1"
-for required in \
-	"$backup_dir"/*-site_config_backup.json \
-	"$backup_dir"/*-database.sql.gz \
-	"$backup_dir"/*-files.tgz \
-	"$backup_dir"/*-private-files.tgz; do
-	test -s "$required"
-done
-' -- "$CANONICAL_BACKUP_DIR"
-	echo "PRODUCTION_BACKUP_CANONICAL_VERIFIED path=$CANONICAL_BACKUP_DIR"
+	docker exec "$BACKEND" env CANONICAL_BACKUP_DIR="$CANONICAL_BACKUP_DIR" python3 -c '
+import os
+from pathlib import Path
+
+backup_dir = Path(os.environ["CANONICAL_BACKUP_DIR"])
+files = [path for path in backup_dir.iterdir() if path.is_file() and path.stat().st_size > 0]
+checks = {
+    "site configuration": lambda name: name.endswith("-site_config_backup.json"),
+    "database": lambda name: name.endswith("-database.sql.gz"),
+    "public files": lambda name: name.endswith("-files.tgz") and not name.endswith("-private-files.tgz"),
+    "private files": lambda name: name.endswith("-private-files.tgz"),
+}
+missing = [label for label, matches in checks.items() if not any(matches(path.name) for path in files)]
+assert not missing, f"Canonical production backup is incomplete: {missing}"
+print(f"PRODUCTION_BACKUP_CANONICAL_VERIFIED path={backup_dir} files={len(files)}")
+'
 }
 
 set_maintenance_off() {
@@ -163,44 +175,26 @@ set_maintenance_off() {
 	return 1
 }
 
-set_maintenance_on() {
-	if docker exec "$BACKEND" bench --site "$SITE" set-maintenance-mode on; then
-		MAINTENANCE_ENABLED=1
-		return 0
-	fi
-	# The backend may be stopped after a partial Compose switch. A one-off
-	# container can still update the shared sites volume without public traffic.
-	if ZH_IMAGE="${PREVIOUS_IMAGE:-$ZH_IMAGE}" docker compose \
-		-p "$PROJECT" -f "$BASE_COMPOSE" -f "$OVERRIDE" \
-		run --rm --no-deps -T --pull never --entrypoint bench backend \
-		--site "$SITE" set-maintenance-mode on; then
-		MAINTENANCE_ENABLED=1
-		return 0
-	fi
-	return 1
-}
-
 rollback() {
 	local exit_code="$1"
 	local rollback_ok=1
 	trap - EXIT INT TERM
 	set +e
 
-	echo "ZH_CN_DEPLOY_FAILED_ROLLING_BACK"
-
-	# A migration can commit schema/data changes before a later command fails.
-	# Never expose an old image against an unknown database state. Leave the
-	# candidate in maintenance mode and let the root-owned entrypoint record
-	# recovery_required for an operator-led database/image recovery.
 	if [[ "$MIGRATION_ATTEMPTED" -eq 1 ]]; then
-		set_maintenance_on || echo "MIGRATION_RECOVERY_MAINTENANCE_UNCONFIRMED" >&2
-		echo "MIGRATION_RECOVERY_REQUIRED marker=$MIGRATION_MARKER" >&2
+		echo "DEPLOYMENT_FAILED_AFTER_MIGRATION_MAINTENANCE_REQUIRED marker=$MIGRATION_MARKER backup=$CANONICAL_BACKUP_DIR" >&2
 		cleanup_files
 		exit "$exit_code"
 	fi
 
+	echo "ZH_CN_DEPLOY_FAILED_ROLLING_BACK"
+
 	if [[ "$SERVICES_SWITCHED" -eq 1 && -n "$PREVIOUS_IMAGE" ]]; then
-		set_maintenance_on || rollback_ok=0
+		if docker exec "$BACKEND" bench --site "$SITE" set-maintenance-mode on; then
+			MAINTENANCE_ENABLED=1
+		else
+			rollback_ok=0
+		fi
 
 		ZH_IMAGE="$PREVIOUS_IMAGE" docker compose \
 			-p "$PROJECT" \
@@ -224,19 +218,16 @@ rollback() {
 		done
 	fi
 
-	if [[ "$rollback_ok" -eq 1 && "$MAINTENANCE_ENABLED" -eq 1 ]]; then
+	if [[ "$MAINTENANCE_ENABLED" -eq 1 ]]; then
 		set_maintenance_off || rollback_ok=0
 	fi
 
-	if [[ "$rollback_ok" -eq 1 ]]; then
-		wait_for_https || rollback_ok=0
-	fi
+	wait_for_https || rollback_ok=0
 	cleanup_files
 
 	if [[ "$rollback_ok" -eq 1 ]]; then
 		echo "ROLLBACK_FINISHED image=${PREVIOUS_IMAGE:-unchanged}"
 	else
-		set_maintenance_on || echo "ROLLBACK_MAINTENANCE_UNCONFIRMED" >&2
 		echo "ROLLBACK_INCOMPLETE_MANUAL_CHECK_REQUIRED image=${PREVIOUS_IMAGE:-unknown}" >&2
 	fi
 
@@ -351,21 +342,6 @@ ZH_IMAGE="$ZH_IMAGE" docker compose \
 
 wait_for_backend
 
-# The candidate image may contain DocType, patch, or schema changes. Record the
-# attempt before invoking migrate: even a failed migration may have committed
-# part of its database work, so an image-only rollback is unsafe.
-install -d -m 0700 "$(dirname "$MIGRATION_MARKER")"
-MIGRATION_ATTEMPTED=1
-printf 'site=%q\nrelease=%q\nstarted_at_utc=%q\n' "$SITE" "$RELEASE_NAME" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$MIGRATION_MARKER"
-
-# The candidate image may contain DocType, patch, or schema changes. Run the
-# migration while the new backend is in maintenance mode, before clearing
-# caches or exposing the release to public traffic. A failure exits this
-# script and leaves the release in maintenance for the root-owned entrypoint
-# to perform a guarded recovery.
-docker exec "$BACKEND" bench --site "$SITE" migrate
-echo "SITE_MIGRATION_OK site=$SITE image=$ZH_IMAGE"
-
 for service in "${SERVICES[@]}"; do
 	container="${PROJECT}-${service}-1"
 	state="$(docker inspect "$container" --format '{{.Config.Image}} {{.Image}} {{.State.Running}} {{.RestartCount}}')"
@@ -375,6 +351,14 @@ for service in "${SERVICES[@]}"; do
 		exit 1
 	fi
 done
+
+install -d -m 0700 "$(dirname "$MIGRATION_MARKER")"
+printf 'candidate_image=%s\nstarted_at_utc=%s\n' "$ZH_IMAGE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$MIGRATION_MARKER"
+chmod 600 "$MIGRATION_MARKER"
+# From this point an image-only rollback may be schema-incompatible. Keep
+# maintenance enabled on failure and require restore or forward recovery.
+MIGRATION_ATTEMPTED=1
+docker exec "$BACKEND" bench --site "$SITE" migrate
 
 docker exec "$BACKEND" \
 	/home/frappe/frappe-bench/env/bin/python \
