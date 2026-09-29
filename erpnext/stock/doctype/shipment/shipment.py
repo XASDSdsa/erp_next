@@ -9,6 +9,7 @@ from frappe.model.document import Document
 from frappe.utils import flt, get_time
 
 from erpnext.accounts.party import get_party_shipping_address
+from erpnext.stock.doctype.shipment import manual_shipping, shipment_contents, shipment_display, shipment_lifecycle
 
 
 class Shipment(Document):
@@ -74,10 +75,14 @@ class Shipment(Document):
 		value_of_goods: DF.Currency
 	# end: auto-generated types
 
+	def onload(self):
+		shipment_contents.load_shipment_contents(self)
+
 	def on_discard(self):
 		self.db_set("status", "Cancelled")
 
 	def validate(self):
+		self.validate_shipping_details()
 		self.validate_weight()
 		self.validate_pickup_time()
 		self.set_value_of_goods()
@@ -85,6 +90,31 @@ class Shipment(Document):
 		self.set_list_display_fields()
 		if self.docstatus == 0:
 			self.status = "Draft"
+
+	def validate_shipping_details(self):
+		manual_shipping.validate_shipment(self)
+		shipment_lifecycle.validate_carrier_change(self)
+		shipment_lifecycle.validate_shipment_links(self)
+
+	def before_update_after_submit(self):
+		self.validate_shipping_details()
+		self.set_list_display_fields()
+
+	def before_cancel(self):
+		# Local document transitions never cancel or modify a carrier booking.
+		# The carrier app owns its explicit booking/cancellation operations.
+		shipment_lifecycle.validate_carrier_change(self)
+		manual_shipping.before_cancel(self)
+
+	def before_discard(self):
+		shipment_lifecycle.validate_carrier_change(self)
+		manual_shipping.before_cancel(self)
+
+	def on_trash(self):
+		manual_shipping.on_trash(self)
+
+	def on_change(self):
+		shipment_display.persist_display_fields(self)
 
 	def on_submit(self):
 		if not self.shipment_parcel:
@@ -97,17 +127,7 @@ class Shipment(Document):
 		self.db_set("status", "Cancelled")
 
 	def set_list_display_fields(self):
-		transport_labels = {
-			"In Progress": "运输中",
-			"Delivered": "已送达",
-			"Returned": "已退回",
-			"Lost": "已丢失",
-		}
-		self.transport_status_display = transport_labels.get(self.tracking_status, self.tracking_status or "")
-		self.freight_status_display = self.freight_status_display or ""
-		self.interception_status_display = self.interception_status_display or ""
-		waybill = self.shipment_id or self.awb_number or ""
-		self.label_replacement_display = f"当前 {waybill}" if waybill else ""
+		shipment_display.set_display_fields(self)
 
 	def validate_weight(self):
 		for parcel in self.shipment_parcel:
@@ -129,6 +149,11 @@ class Shipment(Document):
 		for entry in self.get("shipment_delivery_note"):
 			value_of_goods += flt(entry.get("grand_total"))
 		self.value_of_goods = value_of_goods if value_of_goods else self.value_of_goods
+
+
+def on_doctype_update():
+	# Keep a cancelled physical waybill reserved and protect concurrent saves.
+	frappe.db.add_unique("Shipment", ["manual_waybill_key"], constraint_name="manual_carrier_waybill_unique")
 
 
 @frappe.whitelist()

@@ -546,6 +546,14 @@ class SalesOrder(SellingController):
 			(doctype.sales_order == self.name) & (doctype.sales_order_item.notin(items))
 		).run()
 
+	def before_cancel(self):
+		from erpnext.stock.doctype.shipment.shipment_lifecycle import before_cancel_sales_order
+
+		before_cancel_sales_order(self)
+
+	def before_discard(self):
+		self.before_cancel()
+
 	def on_cancel(self):
 		self.ignore_linked_doctypes = (
 			"GL Entry",

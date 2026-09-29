@@ -63790,3 +63790,87 @@ msgstr ""
 msgid "{} {} is not affecting bank account {}"
 msgstr ""
 
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Submit the Delivery Note before creating a Shipment."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Shipping information was not loaded with this document. Reload the Delivery Note."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "You do not have permission to view the linked Shipment."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "No Shipment has been created. Use Create > Shipment and select a carrier on the Shipment."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Shipment Status"
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Transport Status"
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Historical Shipment"
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Open Shipment"
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Pickup and Delivery Details"
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Contents"
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Multiple carrier integrations match this Shipment. Check the carrier registrations."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "This shipment is still a Draft. Click Submit in the top right when the information is complete."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment
+msgid "Save or reload the Shipment to view its linked contents."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment
+msgid "You do not have permission to view the linked contents."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment
+msgid "No goods linked. Associate a Delivery Note first."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment
+msgid "You do not have permission to view the linked Delivery Note contents."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment
+msgid "You do not have permission to view the linked Shipment. Please contact your administrator."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment
+msgid "Delivery Notes must be provided as a list."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment
+msgid "This Shipment has a waybill or carrier booking history. Create a separate Shipment to change shipping providers."
+msgstr ""
+
+#: erpnext/stock/doctype/shipment
+msgid "No freight information"
+msgstr ""
+
+#: erpnext/stock/doctype/shipment
+msgid "Freight unavailable"
+msgstr ""

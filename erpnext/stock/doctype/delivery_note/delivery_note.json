@@ -92,6 +92,8 @@
   "product_bundle_help",
   "pricing_rule_details",
   "pricing_rules",
+  "shipping_section",
+  "shipping_details",
   "address_and_contact_tab",
   "contact_info",
   "customer_address",
@@ -1455,6 +1457,18 @@
    "fieldtype": "Data",
    "label": "Title",
    "no_copy": 1,
+   "print_hide": 1
+  },
+  {
+   "fieldname": "shipping_section",
+   "fieldtype": "Section Break",
+   "label": "Shipping",
+   "print_hide": 1
+  },
+  {
+   "fieldname": "shipping_details",
+   "fieldtype": "HTML",
+   "label": "Shipping Details",
    "print_hide": 1
   }
  ],

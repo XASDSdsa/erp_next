@@ -79,6 +79,7 @@ frappe.ui.form.on("Delivery Note", {
 	},
 
 	refresh: function (frm) {
+		frm.events.render_shipping_overview(frm);
 		if (
 			frm.doc.docstatus === 1 &&
 			frm.doc.is_return === 1 &&
@@ -122,6 +123,62 @@ frappe.ui.form.on("Delivery Note", {
 				);
 			}
 		}
+	},
+});
+
+// Shipment owns carrier-neutral shipping state; carrier-specific actions belong on its form.
+frappe.ui.form.on("Delivery Note", {
+	render_shipping_overview(frm) {
+		const field = frm.fields_dict.shipping_details;
+		if (!field?.$wrapper) return;
+		const $host = field.$wrapper;
+		const unavailable = frm.doc.docstatus === 2 || !!frm.doc.is_return;
+		frm.toggle_display("shipping_section", !unavailable);
+		if (unavailable) {
+			$host.empty();
+			return;
+		}
+		const escape = (value) => frappe.utils.escape_html(String(value || ""));
+		const show_message = (message) => $host.html(`<p class="text-muted">${escape(message)}</p>`);
+		if (frm.is_new() || frm.doc.docstatus !== 1) {
+			show_message(__("Submit the Delivery Note before creating a Shipment."));
+			return;
+		}
+		const state = frm.doc.__onload?.shipping_state;
+		if (!state) {
+			show_message(__("Shipping information was not loaded with this document. Reload the Delivery Note."));
+			return;
+		}
+		if (state.restricted || state.unavailable) {
+			show_message(state.message || __("You do not have permission to view the linked Shipment."));
+			return;
+		}
+		const shipment = state.shipment ? state : state.historical_shipment;
+		if (!shipment?.shipment) {
+			show_message(__("No Shipment has been created. Use Create > Shipment and select a carrier on the Shipment."));
+			return;
+		}
+		const summary = [
+			[__("Service Provider"), shipment.service_provider || shipment.carrier],
+			[__("AWB Number"), shipment.shipment_id || shipment.awb_number],
+			[__("Shipment Status"), shipment.shipment_status],
+			[__("Transport Status"), shipment.transport_status_display || shipment.tracking_status],
+			[__("Freight"), shipment.freight_status_display],
+		].filter(([, value]) => value);
+		$host.html(`<div class="shipment-overview">
+			<p><strong>${escape(state.shipment ? __("Shipment") : __("Historical Shipment"))}: ${escape(shipment.shipment)}</strong></p>
+			${summary.map(([label, value]) => `<p>${escape(label)}: ${escape(value)}</p>`).join("")}
+			<button type="button" class="btn btn-default btn-sm" data-open-shipment>${escape(__("Open Shipment"))}</button>
+		</div>`);
+		$host.find("[data-open-shipment]").on("click", () => {
+			frm.events.open_shipping_shipment(frm, shipment.shipment);
+		});
+	},
+
+	open_shipping_shipment(frm, shipment) {
+		// Reload server-projected shipping state when returning, without discarding unsaved edits.
+		if (!frm.is_dirty()) frappe.model.remove_from_locals("Delivery Note", frm.doc.name);
+		frappe.set_route("Form", "Shipment", shipment);
 	},
 });
 

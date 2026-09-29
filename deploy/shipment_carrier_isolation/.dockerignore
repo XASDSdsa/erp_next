@@ -1,0 +1,5 @@
+*
+!Dockerfile
+!candidate-sources.json
+!app-source/
+!app-source/**

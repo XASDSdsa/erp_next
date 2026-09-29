@@ -37,6 +37,7 @@
   "total_weight",
   "column_break_28",
   "shipment_delivery_note",
+  "shipment_contents",
   "shipment_details_section",
   "pallets",
   "value_of_goods",
@@ -51,6 +52,25 @@
   "section_break_40",
   "shipment_information_section",
   "service_provider",
+  "manual_shipping_section",
+  "manual_shipping_help",
+  "manual_carrier",
+  "manual_carrier_name",
+  "manual_waybill",
+  "manual_waybill_override",
+  "manual_destination",
+  "manual_transport_status",
+  "manual_freight_column",
+  "manual_freight_recorded",
+  "manual_freight_amount",
+  "manual_freight_currency",
+  "manual_settlement_status",
+  "manual_evidence",
+  "manual_note",
+  "manual_recorded_by",
+  "manual_recorded_at",
+  "manual_waybill_key",
+  "manual_shipping_end",
   "shipment_id",
   "shipment_amount",
   "status",
@@ -70,8 +90,10 @@
  "fields": [
   {
    "fieldname": "heading_pickup_from",
-   "fieldtype": "Heading",
-   "label": "Pickup from"
+   "fieldtype": "Section Break",
+   "label": "Pickup and Delivery Details",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.__islocal"
   },
   {
    "default": "Company",
@@ -230,13 +252,15 @@
    "fieldname": "shipment_parcel",
    "fieldtype": "Table",
    "label": "Shipment Parcel",
-   "options": "Shipment Parcel"
+   "options": "Shipment Parcel",
+   "allow_on_submit": 1
   },
   {
    "fieldname": "parcel_template",
    "fieldtype": "Link",
    "label": "Parcel Template",
-   "options": "Shipment Parcel Template"
+   "options": "Shipment Parcel Template",
+   "allow_on_submit": 1
   },
   {
    "depends_on": "eval:doc.docstatus !== 1\n",
@@ -246,7 +270,8 @@
   },
   {
    "fieldname": "column_break_28",
-   "fieldtype": "Column Break"
+   "fieldtype": "Section Break",
+   "hidden": 0
   },
   {
    "fieldname": "shipment_details_section",
@@ -313,7 +338,8 @@
    "fieldname": "description_of_content",
    "fieldtype": "Small Text",
    "label": "Description of Content",
-   "reqd": 1
+   "reqd": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "section_break_40",
@@ -326,17 +352,21 @@
   },
   {
    "fieldname": "service_provider",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "label": "Service Provider",
    "no_copy": 1,
-   "print_hide": 1
+   "print_hide": 1,
+   "options": "\nLetMeShip\nSendCloud\n其他物流（手工登记）",
+   "read_only": 0,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "shipment_id",
    "fieldtype": "Data",
    "label": "Shipment ID",
    "no_copy": 1,
-   "print_hide": 1
+   "print_hide": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "shipment_amount",
@@ -344,16 +374,18 @@
    "label": "Shipment Amount",
    "no_copy": 1,
    "precision": "2",
-   "print_hide": 1
+   "print_hide": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
    "no_copy": 1,
-   "options": "Draft\nSubmitted\nBooked\nCancelled\nCompleted",
+   "options": "Draft\nSubmitted\nBooked\nCancelled\nCompleted\n待打单发货\n已发货\n已取消发货",
    "print_hide": 1,
-   "read_only": 1
+   "read_only": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "tracking_url",
@@ -362,28 +394,32 @@
    "label": "Tracking URL",
    "no_copy": 1,
    "print_hide": 1,
-   "read_only": 1
+   "read_only": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "carrier",
    "fieldtype": "Data",
    "label": "Carrier",
    "no_copy": 1,
-   "print_hide": 1
+   "print_hide": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "carrier_service",
    "fieldtype": "Data",
    "label": "Carrier Service",
    "no_copy": 1,
-   "print_hide": 1
+   "print_hide": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "awb_number",
    "fieldtype": "Data",
    "label": "AWB Number",
    "no_copy": 1,
-   "print_hide": 1
+   "print_hide": 1,
+   "allow_on_submit": 1
   },
   {
    "allow_on_submit": 1,
@@ -400,7 +436,8 @@
    "label": "Tracking Status Info",
    "no_copy": 1,
    "print_hide": 1,
-   "read_only": 1
+   "read_only": 1,
+   "allow_on_submit": 1
   },
   {
    "allow_on_submit": 1,
@@ -481,6 +518,176 @@
    "fieldtype": "Float",
    "label": "Total Weight (kg)",
    "read_only": 1
+  },
+  {
+   "fieldname": "manual_shipping_section",
+   "label": "其他物流手工登记",
+   "fieldtype": "Section Break",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "manual_shipping_help",
+   "label": "登记说明",
+   "fieldtype": "HTML",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "options": "<p class='text-muted'>仅登记已取得的物流单号，不调用物流接口。目的地址为实际收货地点；寄到货代仓不代表客户已签收。人工运费与结算记录不生成会计凭证。</p>"
+  },
+  {
+   "fieldname": "manual_carrier",
+   "label": "物流服务商",
+   "fieldtype": "Select",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 0,
+   "options": "\n顺丰国内\n中通快递\n圆通速递\n申通快递\n韵达快递\n极兔速递\n京东物流\n邮政EMS\n德邦快递\n德邦快运\n跨越速运\n安能物流\n中通快运\n顺心捷达\n其他",
+   "mandatory_depends_on": "eval:doc.service_provider === '其他物流（手工登记）'"
+  },
+  {
+   "fieldname": "manual_carrier_name",
+   "label": "其他服务商名称",
+   "fieldtype": "Data",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）' && doc.manual_carrier === '其他'",
+   "allow_on_submit": 0,
+   "mandatory_depends_on": "eval:doc.service_provider === '其他物流（手工登记）' && doc.manual_carrier === '其他'"
+  },
+  {
+   "fieldname": "manual_waybill",
+   "label": "已有物流单号",
+   "fieldtype": "Data",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 0,
+   "mandatory_depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "no_copy": 1,
+   "description": "按面单原样填写一个单号，保留前导零；此处不联网验证真伪。"
+  },
+  {
+   "fieldname": "manual_waybill_override",
+   "label": "单号格式已核对",
+   "fieldtype": "Check",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "no_copy": 1,
+   "description": "仅单号格式与常见规则不符时勾选，并在下方填写核对说明。"
+  },
+  {
+   "fieldname": "manual_destination",
+   "label": "实际收货目的地",
+   "fieldtype": "Select",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "options": "客户地址\n货代或港口仓",
+   "default": "客户地址",
+   "description": "货代或港口仓请在收货地址中选择实际国内地址，不更改客户默认地址。"
+  },
+  {
+   "fieldname": "manual_transport_status",
+   "label": "运输状态（人工登记）",
+   "fieldtype": "Select",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "options": "待交运\n已交运\n已送达\n已交接货代\n已退回\n异常",
+   "default": "待交运"
+  },
+  {
+   "fieldname": "manual_freight_column",
+   "label": "运费",
+   "fieldtype": "Column Break",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "manual_freight_recorded",
+   "label": "运费已登记",
+   "fieldtype": "Check",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "description": "金额未知时不要勾选；已确认免费可填写 0 并说明原因。"
+  },
+  {
+   "fieldname": "manual_freight_amount",
+   "label": "人工运费",
+   "fieldtype": "Currency",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）' && doc.manual_freight_recorded",
+   "allow_on_submit": 1,
+   "options": "manual_freight_currency"
+  },
+  {
+   "fieldname": "manual_freight_currency",
+   "label": "运费币种",
+   "fieldtype": "Link",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）' && doc.manual_freight_recorded",
+   "allow_on_submit": 1,
+   "options": "Currency",
+   "default": "CNY"
+  },
+  {
+   "fieldname": "manual_settlement_status",
+   "label": "结算状态（人工记录）",
+   "fieldtype": "Select",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "options": "待结算\n已结算（人工确认）",
+   "default": "待结算",
+   "description": "人工确认不等于已记账；会计记账与实际付款仍走原财务流程。"
+  },
+  {
+   "fieldname": "manual_evidence",
+   "label": "面单或运费凭据",
+   "fieldtype": "Attach",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "manual_note",
+   "label": "登记或变更说明",
+   "fieldtype": "Small Text",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "description": "运费为零、异常单号、运输及费用变更时填写原因。"
+  },
+  {
+   "fieldname": "manual_recorded_by",
+   "label": "最近登记人",
+   "fieldtype": "Link",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "manual_recorded_at",
+   "label": "最近登记时间",
+   "fieldtype": "Datetime",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "manual_waybill_key",
+   "label": "手工单号唯一标识",
+   "fieldtype": "Data",
+   "depends_on": "eval:doc.service_provider === '其他物流（手工登记）'",
+   "allow_on_submit": 1,
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "manual_shipping_end",
+   "label": "物流信息",
+   "fieldtype": "Section Break",
+   "depends_on": "",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "shipment_contents",
+   "fieldtype": "HTML",
+   "label": "Contents",
+   "print_hide": 1
   }
  ],
  "is_submittable": 1,
@@ -519,6 +726,25 @@
    "share": 1,
    "submit": 1,
    "write": 1
+  },
+  {
+   "role": "Sales User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "share": 1,
+   "print": 1,
+   "email": 1,
+   "export": 1,
+   "delete": 0,
+   "report": 0,
+   "cancel": 0,
+   "amend": 0,
+   "import": 0,
+   "select": 0,
+   "if_owner": 0,
+   "permlevel": 0
   }
  ],
  "row_format": "Dynamic",

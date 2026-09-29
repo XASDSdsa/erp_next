@@ -125,3 +125,48 @@ frappe.listview_settings["Sales Order"] = {
 		}
 	},
 };
+
+// Native Sales Order owns generic freight and advance-payment presentation.
+// Carrier apps contribute summaries through the Shipment carrier adapter interface.
+(function () {
+	const settings = frappe.listview_settings["Sales Order"];
+	settings.add_fields = [...new Set([
+		...(settings.add_fields || []), "advance_paid", "rounded_total", "grand_total", "currency", "advance_payment_status",
+	])];
+	settings.formatters = settings.formatters || {};
+	settings.formatters.advance_paid = function (value, df, doc) {
+		const total = flt(doc.rounded_total || doc.grand_total);
+		const paid = flt(value);
+		const pct = total ? Math.min(100, Math.round((paid / total) * 100)) : 0;
+		const paid_text = frappe.utils.escape_html(format_currency(paid, doc.currency));
+		const bar_class = pct >= 100 ? "progress-bar-success" : paid > 0 ? "progress-bar-warning" : "";
+		return `<div style="display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap;">
+			<span style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:right;font-variant-numeric:tabular-nums;">${paid_text}</span>
+			<div class="progress" style="margin:0;height:10px;flex:1 0 24px;min-width:24px;" title="${frappe.utils.escape_html(__("Advance Paid"))} ${paid_text} · ${pct}%">
+				<div class="progress-bar ${bar_class}" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" style="width:${pct}%;"></div>
+			</div>
+		</div>`;
+	};
+	settings.formatters.shipment_freight = function (value) {
+		const row = value || { text: __("Freight unavailable"), color: "gray", extra: "", title: "" };
+		const escape = (text) => frappe.utils.escape_html(String(text || ""));
+		const color = ["gray", "green", "blue", "orange", "red"].includes(row.color) ? row.color : "gray";
+		const title = escape(row.title);
+		const pill = `<span class="indicator-pill ${color} no-indicator-dot ellipsis" style="flex-shrink:0;max-width:100%;" title="${title}"><span class="ellipsis"> ${escape(row.text)}</span></span>`;
+		const extra = row.extra
+			? `<span class="shipment-freight-amount" style="font-size:var(--text-xs);color:var(--text-muted);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escape(row.extra)}</span>`
+			: "";
+		return `<div class="shipment-freight-cell" style="display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;" title="${title}">${pill}${extra}</div>`;
+	};
+	settings.additional_columns = [
+		...(settings.additional_columns || []),
+		{ fieldname: "shipment_freight", label: "Freight", fieldtype: "Data", in_list_view: 1, insert_after: "status_field", width: 220 },
+	];
+	settings.method = "erpnext.stock.doctype.shipment.shipment_list_api.get_sales_orders";
+	const native_onload = settings.onload;
+	settings.onload = function (listview) {
+		const result = native_onload?.call(this, listview);
+		if (listview.view_name === "List") listview.method = settings.method;
+		return result;
+	};
+})();

@@ -66420,3 +66420,87 @@ msgstr "{} {}未影响银行账户{}"
 
 #~ msgid "Preferences"
 #~ msgstr "偏好设置"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Submit the Delivery Note before creating a Shipment."
+msgstr "请先提交出库单，再创建运单。"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Shipping information was not loaded with this document. Reload the Delivery Note."
+msgstr "物流信息未随单据加载，请重新载入出库单。"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "You do not have permission to view the linked Shipment."
+msgstr "你没有查看关联运单的权限。"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "No Shipment has been created. Use Create > Shipment and select a carrier on the Shipment."
+msgstr "尚未创建运单。请点击“创建 → 运单”，并在运单中选择物流服务商。"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Shipment Status"
+msgstr "运单状态"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Transport Status"
+msgstr "运输状态"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Historical Shipment"
+msgstr "历史运单"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Open Shipment"
+msgstr "打开运单"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Pickup and Delivery Details"
+msgstr "寄件与收件信息"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Contents"
+msgstr "货物明细"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "Multiple carrier integrations match this Shipment. Check the carrier registrations."
+msgstr "多个物流服务商扩展同时匹配此运单，请检查服务商注册配置。"
+
+#: erpnext/stock/doctype/shipment/shipment.js
+msgid "This shipment is still a Draft. Click Submit in the top right when the information is complete."
+msgstr "当前运单是草稿，信息填完后请点右上角“提交”。"
+
+#: erpnext/stock/doctype/shipment
+msgid "Save or reload the Shipment to view its linked contents."
+msgstr "请保存或重新载入运单，以查看关联货物明细。"
+
+#: erpnext/stock/doctype/shipment
+msgid "You do not have permission to view the linked contents."
+msgstr "你没有查看关联货物明细的权限。"
+
+#: erpnext/stock/doctype/shipment
+msgid "No goods linked. Associate a Delivery Note first."
+msgstr "尚未关联货物，请先关联出库单。"
+
+#: erpnext/stock/doctype/shipment
+msgid "You do not have permission to view the linked Delivery Note contents."
+msgstr "你没有查看关联出库单货物明细的权限。"
+
+#: erpnext/stock/doctype/shipment
+msgid "You do not have permission to view the linked Shipment. Please contact your administrator."
+msgstr "你没有查看关联运单的权限，请联系管理员。"
+
+#: erpnext/stock/doctype/shipment
+msgid "Delivery Notes must be provided as a list."
+msgstr "出库单必须以列表形式提供。"
+
+#: erpnext/stock/doctype/shipment
+msgid "This Shipment has a waybill or carrier booking history. Create a separate Shipment to change shipping providers."
+msgstr "此运单已有物流单号或服务商下单记录。如需更换物流服务商，请创建新运单。"
+
+#: erpnext/stock/doctype/shipment
+msgid "No freight information"
+msgstr "暂无运费信息"
+
+#: erpnext/stock/doctype/shipment
+msgid "Freight unavailable"
+msgstr "运费信息暂不可用"

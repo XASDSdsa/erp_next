@@ -244,6 +244,9 @@ class DeliveryNote(SellingController):
 
 	def onload(self):
 		super().onload()
+		from erpnext.stock.doctype.shipment.shipment_summary import load_delivery_note_shipping_state
+
+		load_delivery_note_shipping_state(self)
 
 		if self.docstatus == 0:
 			self.set_onload("has_unpacked_items", self.has_unpacked_items())
@@ -286,6 +289,9 @@ class DeliveryNote(SellingController):
 					frappe.throw(_("Sales Order required for Item {0}").format(d.item_code))
 
 	def validate(self):
+		from erpnext.stock.doctype.shipment.shipment_lifecycle import validate_delivery_note_orders
+
+		validate_delivery_note_orders(self)
 		self.validate_posting_time()
 		super().validate()
 		self.validate_references()
@@ -478,6 +484,14 @@ class DeliveryNote(SellingController):
 		self.update_stock_ledger()
 		self.make_gl_entries()
 		self.repost_future_sle_and_gle()
+
+	def before_cancel(self):
+		from erpnext.stock.doctype.shipment.shipment_lifecycle import before_cancel_delivery_note
+
+		before_cancel_delivery_note(self)
+
+	def before_discard(self):
+		self.before_cancel()
 
 	def on_cancel(self):
 		super().on_cancel()
@@ -1159,6 +1173,9 @@ def make_shipment(source_name, target_doc=None):
 		postprocess,
 	)
 
+	from erpnext.stock.doctype.shipment.shipment_contents import load_shipment_contents
+
+	load_shipment_contents(doclist)
 	return doclist
 
 

@@ -16,19 +16,22 @@
    "fieldname": "length",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Length (cm)"
+   "label": "Length (cm)",
+   "allow_on_submit": 1
   },
   {
    "fieldname": "width",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Width (cm)"
+   "label": "Width (cm)",
+   "allow_on_submit": 1
   },
   {
    "fieldname": "height",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Height (cm)"
+   "label": "Height (cm)",
+   "allow_on_submit": 1
   },
   {
    "fieldname": "weight",
@@ -36,7 +39,8 @@
    "in_list_view": 1,
    "label": "Weight (kg)",
    "precision": "1",
-   "reqd": 1
+   "reqd": 1,
+   "allow_on_submit": 1
   },
   {
    "default": "1",
@@ -44,7 +48,8 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Count",
-   "reqd": 1
+   "reqd": 1,
+   "allow_on_submit": 1
   }
  ],
  "istable": 1,
