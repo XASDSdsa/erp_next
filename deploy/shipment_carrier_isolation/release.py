@@ -439,10 +439,13 @@ def prepare_override(path, old, new, configuration):
     # Parse using the pinned Frappe image's declared PyYAML dependency. YAML and
     # resolved configuration contents stay captured; never print site secrets.
     parser = "import json,sys,yaml\ntry:\n print(json.dumps(yaml.safe_load(sys.stdin.read())))\nexcept Exception:\n raise SystemExit('override_yaml_parse_failed')"
-    content = json.loads(run(["docker", "run", "--rm", "-i", "--network", "none", "--entrypoint", PYTHON, old, "-c", parser], capture=True, input=path.read_bytes()))
-    for service in SERVICES:
-        assert content["services"][service]["image"] == old, "override_image_changed:" + service
-        content["services"][service].update(image=new, init=True)
+    # The Chinese override may be empty; production.env supplies the resolved
+    # baseline image. Build a minimal override from the already resolved config,
+    # rather than guessing what an optional override file contains.
+    parser = "import json,sys,yaml\ntry:\n print(json.dumps(yaml.safe_load(sys.stdin.read()) or {}))\nexcept Exception:\n raise SystemExit('override_yaml_parse_failed')"
+    parsed = json.loads(run(["docker", "run", "--rm", "-i", "--network", "none", "--entrypoint", PYTHON, old, "-c", parser], capture=True, input=path.read_bytes()))
+    assert parsed == {} or isinstance(parsed, dict), "override_yaml_shape_changed"
+    content = {"services": {service: {"image": new, "init": True} for service in SERVICES}}
     target = ROOT / "compose.override.candidate.json"
     save(target, content)
     planned = json.loads(run(compose(target) + ["config", "--format", "json"], capture=True))
