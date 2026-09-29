@@ -5,6 +5,8 @@ ARG SF_REV
 ARG SHIPPING_REV
 ARG RELEASE_NAME
 USER root
+COPY assets-entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod 0755 /usr/local/bin/entrypoint.sh
 COPY --chown=frappe:frappe app-source/ /home/frappe/frappe-bench/apps/
 COPY candidate-sources.json /tmp/candidate-sources.json
 RUN python3 -c 'import json,pathlib; root=pathlib.Path("/home/frappe/frappe-bench/apps"); manifest=json.loads(pathlib.Path("/tmp/candidate-sources.json").read_text()); [(root/app/path).unlink(missing_ok=True) for app,data in manifest.items() for path in data["deleted"]]; pathlib.Path("/tmp/candidate-sources.json").unlink()'

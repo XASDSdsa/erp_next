@@ -47,6 +47,21 @@ immutable candidate. The historical baseline banking lockfile exception is
 pinned by both original Git and observed build-output hashes; the new candidate
 uses its exact Git lockfile and performs no install.
 
+The r5 startup wrapper removed and recreated the shared `sites/assets` symlink.
+Concurrent service starts were observed to create `sites/assets/assets` and fail
+with `File exists`, restarting the backend. The candidate's published
+`assets-entrypoint.sh` creates a unique temporary symlink in the same directory
+and atomically replaces the destination with `mv -Tf`; it refuses to erase a
+real directory. The build context includes this script, and preparation plus
+runtime backend/frontend checks verify its exact Git SHA-256 and executable mode.
+All deployment, recovery and rollback starts run one service at a time, waiting
+at most 15 seconds for its main process to finish the asset wrapper's `exec`.
+With Docker init, the probe reads init's child; otherwise it reads PID 1. It
+requires a nonempty command line without the wrapper's exact path. Existing
+health checks then verify application behavior. This also prevents concurrent
+asset initialization on the unchanged rollback image; recovery does not force
+recreate already running workers.
+
 Rehearsal creates one **internal** Docker network with fresh MariaDB, Redis and
 sites/logs/DB volumes. It imports only the backup copy; no production mount,
 network, worker, scheduler or published port is used. All DB/Redis settings in

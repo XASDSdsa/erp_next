@@ -19,10 +19,10 @@ ROOT = Path(__file__).resolve().parent
 BENCH = "/home/frappe/frappe-bench"
 SITES = BENCH + "/sites"
 PYTHON = BENCH + "/env/bin/python"
-SERVICES = ["backend", "frontend", "websocket", "queue-long", "queue-short", "scheduler"]
+SERVICES = ["backend", "websocket", "frontend", "queue-long", "queue-short", "scheduler"]
 BACKGROUND = ["scheduler", "queue-long", "queue-short"]
 LEGACY_BASE_ID = "sha256:944e83eb7c7f495e8a889c8b1d7ca97f7b8fe88bbe8ed0e7b3c8acdd5ed9899f"
-TOOLS = ["release.py", "release.sh", "release.env", "metadata.py", "verify_code.py", "check_health.py", "validate_backup.py", "Dockerfile", ".dockerignore"]
+TOOLS = ["release.py", "release.sh", "release.env", "metadata.py", "verify_code.py", "check_health.py", "validate_backup.py", "Dockerfile", ".dockerignore", "assets-entrypoint.sh"]
 os.umask(0o077)
 os.chdir(ROOT)
 
@@ -102,6 +102,16 @@ def verify(target, manifest, image=False, **options):
     for key, value in options.items():
         command.extend(["--" + key.replace("_", "-"), value])
     run(command)
+    if manifest == "candidate-sources.json":
+        verify_startup(target, image=image)
+
+
+def verify_startup(target, *, image=False):
+    assert inspection(target)["Config"]["Entrypoint"] == ["/usr/local/bin/entrypoint.sh"], "unexpected_asset_entrypoint"
+    command = ["docker", "run", "--rm", "--network", "none", "--entrypoint", PYTHON, target] if image else ["docker", "exec", target, PYTHON]
+    code = "import hashlib,pathlib; p=pathlib.Path('/usr/local/bin/entrypoint.sh'); assert p.stat().st_mode & 0o777 == 0o755; print(hashlib.sha256(p.read_bytes()).hexdigest())"
+    assert run(command + ["-c", code], capture=True) == sha(ROOT / "assets-entrypoint.sh"), "asset_entrypoint_source_mismatch"
+    print("STARTUP_SOURCE_OK " + target)
 
 
 def running(expected_image, expected_id, services=SERVICES, *, init=None):
@@ -281,6 +291,38 @@ def stopped(services):
 
 def container_name(service):
     return required("PROJECT") + "-" + service + "-1"
+
+
+def start_services(services, *, force_recreate=False):
+    # Even rollback retains the old immutable image. Serialize its shared-sites
+    # asset wrapper, and wait for exec before starting another service.
+    probe = """import json,pathlib,sys
+try:
+ pids=pathlib.Path('/proc/1/task/1/children').read_text().split() if sys.argv[1]=='init' else ['1']
+ args=pathlib.Path('/proc/'+pids[0]+'/cmdline').read_bytes().rstrip(b'\\0').decode().split('\\0') if len(pids)==1 else []
+except FileNotFoundError:
+ args=[]
+ready=bool(args and args[0]) and '/usr/local/bin/entrypoint.sh' not in args
+print(json.dumps({'ready':ready,'program':pathlib.Path(args[0]).name if ready else None}))
+"""
+    for service in services:
+        command = compose() + ["up", "-d", "--no-deps", "--pull", "never"]
+        if force_recreate:
+            command.append("--force-recreate")
+        run(command + [service])
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            actual = inspection(container_name(service))
+            if actual["State"]["Running"] and not actual["State"].get("Restarting"):
+                result = run(["docker", "exec", container_name(service), PYTHON, "-c", probe, "init" if actual["HostConfig"].get("Init") else "direct"], capture=True, check=False)
+                if result.returncode == 0:
+                    readiness = json.loads(result.stdout)
+                    if readiness["ready"]:
+                        print("STARTUP_EXEC_OK " + service + " " + readiness["program"])
+                        break
+            time.sleep(0.2)
+        else:
+            raise AssertionError("startup_entrypoint_timeout:" + service)
 
 
 def stop_service(service, signal="SIGTERM", grace=120):
@@ -485,7 +527,7 @@ def deploy():
             assert sha(path) == expected, "production_configuration_drift"
         shutil.copyfile(candidate_override, override)
         run(compose() + ["config", "--quiet"])
-        run(compose() + ["up", "-d", "--no-deps", "--force-recreate", "--pull", "never", "backend", "frontend", "websocket"])
+        start_services(["backend", "websocket", "frontend"], force_recreate=True)
         bench("clear-cache")
         bench("clear-website-cache")
         for service in ("backend", "frontend"):
@@ -502,7 +544,7 @@ def deploy():
         maintenance(candidate, False)
         run(["python3", "check_health.py", backend, required("SITE"), "--maintenance-cleared"])
         phase = "background_start"
-        run(compose() + ["up", "-d", "--no-deps", "--force-recreate", "--pull", "never", *BACKGROUND])
+        start_services(BACKGROUND, force_recreate=True)
         running(candidate, saved["candidate_id"], init=True)
         check_logs(started, SERVICES, "services.after.log")
         queue_control(candidate, "resume", network, mounts, db_host)
@@ -521,7 +563,7 @@ def deploy():
         if not mutation_started:
             # No metadata migration has begun. Preserve any active job if the
             # shutdown was interrupted; up without force-recreate leaves it alive.
-            run(compose() + ["up", "-d", "--no-deps", "--pull", "never", *SERVICES])
+            start_services(SERVICES)
             if queue_paused:
                 queue_control(base, "resume", network, mounts, db_host)
                 queue_paused = False
@@ -537,7 +579,7 @@ def deploy():
                 metadata(base, "restore", snapshot, network, mounts, db_host)
             shutil.copy2("compose.override.before.yaml", override)
             run(compose() + ["config", "--quiet"])
-            run(compose() + ["up", "-d", "--no-deps", "--force-recreate", "--pull", "never", "backend", "frontend", "websocket"])
+            start_services(["backend", "websocket", "frontend"], force_recreate=True)
             bench("clear-cache")
             bench("clear-website-cache")
             for service in ("backend", "frontend"):
@@ -546,7 +588,7 @@ def deploy():
             check_logs(started, ["backend", "frontend", "websocket"], "services.rollback.log")
             maintenance(base, False)
             run(["python3", "check_health.py", backend, required("SITE"), "--maintenance-cleared"])
-            run(compose() + ["up", "-d", "--no-deps", "--force-recreate", "--pull", "never", *BACKGROUND])
+            start_services(BACKGROUND, force_recreate=True)
             running(base, saved["base_id"], init=original_init)
             if queue_paused:
                 queue_control(base, "resume", network, mounts, db_host)
