@@ -1932,3 +1932,109 @@ function prompt_for_missing_account(frm, account) {
 function get_deduction_amount_precision() {
 	return frappe.meta.get_field_precision(frappe.meta.get_field("Payment Entry Deduction", "amount"));
 }
+
+frappe.ui.form.on("Payment Entry", {
+	refresh(frm) {
+		return frm.events.leya_guard_payment_entry(frm);
+	},
+
+	// Frappe waits for a Promise returned by before_save, including submit saves.
+	before_save(frm) {
+		return frm.events.leya_block_unconfirmed_extra_pay(frm);
+	},
+
+	leya_payment_snapshot(frm) {
+		return JSON.stringify(frm.doc);
+	},
+
+	leya_linked_references(frm, doctype) {
+		return [...new Set((frm.doc.references || [])
+			.filter((row) => row.reference_doctype === doctype && row.reference_name && flt(row.allocated_amount) > 0)
+			.map((row) => row.reference_name))];
+	},
+
+	async leya_load_order_pay(frm) {
+		if (frm.doc.payment_type !== "Receive" || frm.doc.party_type !== "Customer") return [];
+		const names = frm.events.leya_linked_references(frm, "Sales Order");
+		const invoices = frm.events.leya_linked_references(frm, "Sales Invoice");
+		const invoice_orders = await Promise.all(invoices.map(async (name) => {
+			const invoice = await frappe.db.get_doc("Sales Invoice", name);
+			return (invoice.items || []).map((row) => row.sales_order).filter(Boolean);
+		}));
+		const orders = [...new Set(names.concat(invoice_orders.flat()))].sort();
+		return Promise.all(orders.map(async (name) => {
+			const response = await frappe.db.get_value("Sales Order", name, [
+				"name", "grand_total", "rounded_total", "advance_paid", "currency",
+				"party_account_currency", "conversion_rate",
+			]);
+			const row = response?.message || response;
+			if (!row?.name) throw new Error("无法读取销售订单的预收款信息。");
+			let paid = flt(row.advance_paid);
+			if (row.party_account_currency && row.party_account_currency !== row.currency) {
+				if (flt(row.conversion_rate) <= 0) throw new Error("销售订单缺少有效汇率，无法核对预收款。");
+				paid /= flt(row.conversion_rate);
+			}
+			return { name: row.name, paid, total: flt(row.rounded_total || row.grand_total), currency: row.currency };
+		}));
+	},
+
+	leya_advance_message(frm, orders) {
+		const rows = orders.filter((row) => row.paid > 0).map((row) =>
+			frappe.utils.escape_html(row.name + "：订单金额 " + format_currency(row.total, row.currency)
+				+ "，订单预收 " + format_currency(row.paid, row.currency))
+		);
+		return rows.join("<br>") + "<br>订单预收不等于本张发票已收清。请核对预收分配、发票未收余额和本次收款金额。";
+	},
+
+	async leya_confirm_extra_pay(frm, orders) {
+		const confirm = (message, label) => new Promise((resolve) => {
+			frappe.confirm(message, () => resolve(true), () => resolve(false), label, "取消");
+		});
+		if (!await confirm(frm.events.leya_advance_message(frm, orders), "已核对，继续确认")) return false;
+		return confirm("确认按当前收款单继续保存？提交收款单后才会记账。", "确认继续");
+	},
+
+	async leya_guard_payment_entry(frm) {
+		if (frm.doc.docstatus !== 0) return;
+		const snapshot = frm.events.leya_payment_snapshot(frm);
+		const token = frm._leya_advance_banner_token = (frm._leya_advance_banner_token || 0) + 1;
+		try {
+			const orders = await frm.events.leya_load_order_pay(frm);
+			if (token !== frm._leya_advance_banner_token || snapshot !== frm.events.leya_payment_snapshot(frm)) return;
+			if (orders.some((row) => row.paid > 0)) {
+				frm.dashboard.set_headline_alert(frm.events.leya_advance_message(frm, orders), "orange");
+			}
+		} catch {
+			// The save hook retries and blocks saving if the balance cannot be checked.
+		}
+	},
+
+	async leya_block_unconfirmed_extra_pay(frm) {
+		if (!frm._leya_advance_check) {
+			if (frm.doc.docstatus !== 0) return;
+			const snapshot = frm.events.leya_payment_snapshot(frm);
+			frm._leya_advance_check = (async () => {
+				try {
+					const orders = await frm.events.leya_load_order_pay(frm);
+					if (snapshot !== frm.events.leya_payment_snapshot(frm)) {
+						throw new Error("收款单已修改，请重新保存以核对当前内容。");
+					}
+					if (orders.some((row) => row.paid > 0) && !await frm.events.leya_confirm_extra_pay(frm, orders)) return false;
+					if (snapshot !== frm.events.leya_payment_snapshot(frm)) {
+						throw new Error("收款单已修改，请重新保存以核对当前内容。");
+					}
+					return true;
+				} catch (error) {
+					frappe.msgprint({ title: "预收款核对未完成", message: frappe.utils.escape_html(error.message || "请重试。"), indicator: "red" });
+					return false;
+				}
+			})();
+		}
+		const pending = frm._leya_advance_check;
+		try {
+			if (!await pending) frappe.validated = false;
+		} finally {
+			if (frm._leya_advance_check === pending) delete frm._leya_advance_check;
+		}
+	},
+});

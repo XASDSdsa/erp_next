@@ -235,6 +235,10 @@ class Item(Document):
 		if not self.is_new():
 			self.old_item_group = frappe.db.get_value(self.doctype, self.name, "item_group")
 
+		from erpnext.stock.doctype.item.sticker_stock import validate_sticker_item
+
+		validate_sticker_item(self)
+
 	def on_update(self):
 		from erpnext.stock.utils import clear_valuation_method_cache
 
@@ -1264,6 +1268,11 @@ class Item(Document):
 					title=_("Enable Auto Re-Order"),
 					indicator="orange",
 				)
+
+	def before_validate(self):
+		from erpnext.stock.doctype.item.sticker_models import validate_item_model
+
+		validate_item_model(self)
 
 
 def convert_erpnext_to_barcodenumber(erpnext_number, barcode):

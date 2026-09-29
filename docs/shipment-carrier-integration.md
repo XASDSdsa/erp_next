@@ -6,7 +6,7 @@ Shipment 是 ERPNext 的系统单据。ERPNext 负责原生表单、默认值、
 
 商品及贴纸展示属于原生 Shipment。`__onload.shipment_contents` 提供按 Delivery Note 分组的只读数据，`shipment_contents` HTML 字段负责显示；无权读取时使用 `shipment_contents_restricted` 提示。展示数据不写入业务子表，也不改写全局 `frappe.meta`。Delivery Note 的原生物流概况读取 `__onload.shipping_state`，其单号、状态、运输与运费来源是关联 Shipment。
 
-SF app 只负责 SF 身份识别、外部下单、历史面单、打印、轨迹、拦截、换单、SF 运费账单及其会计处理。其他承运商应在自己的 app 实现同样的扩展边界，不把逻辑加到 SF app，也不替换 Shipment controller 或通用表单事件。取消本地来源单据不等于取消外部运单；外部操作必须是明确的承运商业务动作。
+Shipping 的 `erpnext_shipping.sf_international` 模块只负责 SF 身份识别、外部下单、历史面单、打印、轨迹、拦截、换单、SF 运费账单及其会计处理。其他承运商可在 Shipping 内增加独立服务商模块并注册同样的适配器，不把逻辑加到 SF 模块，也不替换 Shipment controller 或通用表单事件。取消本地来源单据不等于取消外部运单；外部操作必须是明确的承运商业务动作。
 
 ## Python registry
 
@@ -55,7 +55,7 @@ erpnext.shipment.register_carrier("my_carrier", {
 
 ## 无 SF 安装与旧字段兼容
 
-没有 SF app 或任何 adapter 时，原生 Shipment、人工物流、Delivery Note 物流概况、商品贴纸和 Sales Order 人工运费汇总均正常工作。原生模块不导入 SF 或 `erpnext_shipping`；SF app 依赖 ERPNext，但不以第三方 Shipping 插件作为通用数据模型依赖。
+没有 Shipping 或任何 adapter 时，原生 Shipment、人工物流、Delivery Note 物流概况、商品贴纸和 Sales Order 人工运费汇总均正常工作。原生模块不导入 SF 或 `erpnext_shipping`。Shipping 依赖 ERPNext 并提供具体承运商适配；Flow 工具只通过公开业务接口调用。旧独立 `sf_international` 应用已退役，不能再注册相同事件。
 
 `erpnext.stock.doctype.shipment.delivery_note_update.update_delivery_note(delivery_notes, shipment_info=None, tracking_info=None)` 是历史 Delivery Note 投影的内部兼容接口。它仅更新 Delivery Note metadata 中存在的 `delivery_type`、`parcel_service`、`parcel_service_type`、`tracking_number`、`tracking_url`、`tracking_status`、`tracking_status_info`，每张单据一次 `db_set`。这些旧 Custom Field 不存在时直接返回，不创建字段、不要求安装 Shipping 插件。
 

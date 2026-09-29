@@ -212,6 +212,10 @@ class JournalEntry(AccountsController):
 		self.update_invoice_discounting()
 		JournalTaxWithholding(self).on_submit()
 
+		from erpnext.accounts.doctype.payment_entry.paypal_receipt import register_voucher
+
+		register_voucher(self)
+
 	@frappe.whitelist()
 	def get_balance_for_periodic_accounting(self):
 		self.validate_company_for_periodic_accounting()
@@ -324,6 +328,10 @@ class JournalEntry(AccountsController):
 		self.unlink_inter_company_jv()
 		self.unlink_asset_adjustment_entry()
 		self.update_invoice_discounting()
+
+		from erpnext.accounts.doctype.payment_entry.paypal_receipt import register_voucher
+
+		register_voucher(self)
 
 	def get_title(self):
 		return self.pay_to_recd_from or self.accounts[0].account
@@ -1348,6 +1356,16 @@ class JournalEntry(AccountsController):
 	def validate_empty_accounts_table(self):
 		if not self.get("accounts"):
 			frappe.throw(_("Accounts table cannot be blank."))
+
+	def after_insert(self):
+		from erpnext.accounts.doctype.payment_entry.paypal_receipt import register_voucher
+
+		register_voucher(self)
+
+	def before_validate(self):
+		from erpnext.accounts.doctype.payment_entry.paypal_receipt import guard_receipt
+
+		guard_receipt(self)
 
 
 @frappe.whitelist()

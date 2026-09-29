@@ -213,6 +213,10 @@ class PaymentEntry(AccountsController):
 		self.set_status()
 		self.trigger_invoice_update_for_subscriptions()
 
+		from erpnext.accounts.doctype.payment_entry.paypal_receipt import register_voucher
+
+		register_voucher(self)
+
 	def update_linked_dunnings(self):
 		from erpnext.accounts.doctype.dunning.dunning import update_dunnings_linked_to_payment
 
@@ -325,6 +329,10 @@ class PaymentEntry(AccountsController):
 		self.delink_advance_entry_references()
 		self.set_status()
 		self.trigger_invoice_update_for_subscriptions()
+
+		from erpnext.accounts.doctype.payment_entry.paypal_receipt import register_voucher
+
+		register_voucher(self)
 
 	def update_payment_requests(self, cancel=False):
 		from erpnext.accounts.doctype.payment_request.payment_request import (
@@ -2121,6 +2129,16 @@ class PaymentEntry(AccountsController):
 			if key in payment_requests:
 				ref.payment_request = payment_requests[key]
 				del payment_requests[key]  # to avoid duplicate allocation
+
+	def after_insert(self):
+		from erpnext.accounts.doctype.payment_entry.paypal_receipt import register_voucher
+
+		register_voucher(self)
+
+	def before_validate(self):
+		from erpnext.accounts.doctype.payment_entry.paypal_receipt import guard_receipt
+
+		guard_receipt(self)
 
 
 def get_matched_payment_request_of_references(references=None):

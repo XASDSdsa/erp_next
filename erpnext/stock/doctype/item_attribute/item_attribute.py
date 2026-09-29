@@ -45,6 +45,10 @@ class ItemAttribute(Document):
 		self.validate_numeric()
 		self.validate_duplication()
 
+		from erpnext.stock.doctype.item.sticker_models import validate_model_attribute
+
+		validate_model_attribute(self)
+
 	def on_update(self):
 		update_variant_attribute_values(self)
 		update_variant_item_codes_for_abbr_renames(self)
@@ -116,3 +120,13 @@ class ItemAttribute(Document):
 			if d.abbr.lower() in map(str.lower, abbrs):
 				frappe.throw(_("Abbreviation: {0} must appear only once").format(d.abbr.title()))
 			abbrs.append(d.abbr)
+
+	def before_rename(self, old, new, merge=False):
+		from erpnext.stock.doctype.item.sticker_models import protect_model_attribute
+
+		protect_model_attribute(self)
+
+	def on_trash(self):
+		from erpnext.stock.doctype.item.sticker_models import protect_model_attribute
+
+		protect_model_attribute(self)

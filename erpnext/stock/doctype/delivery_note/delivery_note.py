@@ -316,6 +316,10 @@ class DeliveryNote(SellingController):
 		self.validate_against_stock_reservation_entries()
 		self.reset_default_field_value("set_warehouse", "items", "warehouse")
 
+		from erpnext.stock.doctype.item.sticker_stock import validate_delivery_sticker_stock
+
+		validate_delivery_sticker_stock(self)
+
 	def validate_with_previous_doc(self):
 		super().validate_with_previous_doc(
 			{
@@ -705,6 +709,11 @@ class DeliveryNote(SellingController):
 			filters={"new_item_code": ["in", items_list], "disabled": 0},
 			pluck="name",
 		)
+
+	def before_submit(self):
+		from erpnext.stock.doctype.item.sticker_stock import validate_delivery_sticker_stock
+
+		validate_delivery_sticker_stock(self)
 
 
 def update_billed_amount_based_on_so(so_detail, update_modified=True):

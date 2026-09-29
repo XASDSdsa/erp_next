@@ -1257,3 +1257,62 @@ var select_loyalty_program = function (frm, loyalty_programs) {
 
 	dialog.show();
 };
+
+frappe.ui.form.on("Sales Invoice", {
+	setup(frm) { frm.events.leya_default_allocate(frm); },
+	onload(frm) { frm.events.leya_default_allocate(frm); },
+	refresh(frm) { frm.events.leya_default_allocate(frm); return frm.events.leya_guard_invoice_payment(frm); },
+
+	leya_default_allocate(frm) {
+		if (frm.is_new() && !cint(frm.doc.allocate_advances_automatically)) {
+			frm.set_value("allocate_advances_automatically", 1);
+		}
+	},
+
+	async leya_load_order_pay(frm) {
+		const names = [...new Set((frm.doc.items || []).map((row) => row.sales_order).filter(Boolean))].sort();
+		return Promise.all(names.map(async (name) => {
+			const response = await frappe.db.get_value("Sales Order", name, [
+				"name", "grand_total", "rounded_total", "advance_paid", "currency",
+				"party_account_currency", "conversion_rate",
+			]);
+			const row = response?.message || response;
+			if (!row?.name) throw new Error("无法读取销售订单的预收款信息。");
+			let paid = flt(row.advance_paid);
+			if (row.party_account_currency && row.party_account_currency !== row.currency) {
+				if (flt(row.conversion_rate) <= 0) throw new Error("销售订单缺少有效汇率，无法核对预收款。");
+				paid /= flt(row.conversion_rate);
+			}
+			return { name: row.name, paid, total: flt(row.rounded_total || row.grand_total), currency: row.currency };
+		}));
+	},
+
+	async leya_guard_invoice_payment(frm) {
+		const token = frm._leya_advance_banner_token = (frm._leya_advance_banner_token || 0) + 1;
+		const snapshot = JSON.stringify(frm.doc.items || []);
+		const name = frm.doc.name;
+		try {
+			const orders = await frm.events.leya_load_order_pay(frm);
+			if (token !== frm._leya_advance_banner_token || name !== frm.doc.name || snapshot !== JSON.stringify(frm.doc.items || [])) return;
+			$(frm.wrapper).find(".leya-advance-alert").closest(".form-message").remove();
+			const rows = orders.filter((row) => row.paid > 0).map((row) =>
+				frappe.utils.escape_html(row.name + "：订单金额 " + format_currency(row.total, row.currency)
+					+ "，订单预收 " + format_currency(row.paid, row.currency))
+			);
+			if (rows.length) {
+				frm.dashboard.set_headline_alert(
+					'<span class="leya-advance-alert">' + rows.join("<br>")
+						+ "<br>订单预收不等于本张发票已收清。请核对本发票的预收分配与未收余额。</span>",
+					"orange"
+				);
+			}
+		} catch {
+			// Informational only; preserve official payment and allocation workflows.
+		}
+	},
+});
+
+frappe.ui.form.on("Sales Invoice Item", {
+	sales_order(frm) { return frm.events.leya_guard_invoice_payment(frm); },
+	items_remove(frm) { return frm.events.leya_guard_invoice_payment(frm); },
+});

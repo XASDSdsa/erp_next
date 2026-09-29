@@ -1,0 +1,167 @@
+{
+ "doctype": "DocType",
+ "name": "PayPal Receipt Record",
+ "module": "Accounts",
+ "autoname": "prompt",
+ "allow_rename": 0,
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "field_order": [
+  "company",
+  "bank_account",
+  "transaction_id",
+  "sales_order",
+  "customer",
+  "currency",
+  "gross",
+  "fee",
+  "net",
+  "posting_date",
+  "reference_date",
+  "voucher_type",
+  "voucher_name",
+  "status",
+  "request_fingerprint",
+  "request_json",
+  "original_payload"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "label": "Company",
+   "fieldtype": "Link",
+   "options": "Company",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "bank_account",
+   "label": "PayPal Account",
+   "fieldtype": "Link",
+   "options": "Account",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "transaction_id",
+   "label": "PayPal Transaction ID",
+   "fieldtype": "Data",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sales_order",
+   "label": "Sales Order",
+   "fieldtype": "Link",
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer",
+   "label": "Customer",
+   "fieldtype": "Link",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "currency",
+   "label": "Currency",
+   "fieldtype": "Link",
+   "options": "Currency",
+   "default": "USD",
+   "read_only": 1
+  },
+  {
+   "fieldname": "gross",
+   "label": "Gross Receipt",
+   "fieldtype": "Currency",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fee",
+   "label": "PayPal Fee",
+   "fieldtype": "Currency",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "net",
+   "label": "Net Receipt",
+   "fieldtype": "Currency",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "posting_date",
+   "label": "Posting Date",
+   "fieldtype": "Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reference_date",
+   "label": "Reference Date",
+   "fieldtype": "Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "voucher_type",
+   "label": "Voucher Type",
+   "fieldtype": "Select",
+   "options": "\nJournal Entry\nPayment Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "voucher_name",
+   "label": "Voucher",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "label": "Status",
+   "fieldtype": "Select",
+   "options": "Pending\nRecorded\nCancelled",
+   "default": "Pending",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "request_fingerprint",
+   "label": "Request Fingerprint",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "request_json",
+   "label": "Original Request",
+   "fieldtype": "Long Text",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "original_payload",
+   "label": "Original Receipt Snapshot",
+   "fieldtype": "Long Text",
+   "read_only": 1,
+   "hidden": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ]
+}
