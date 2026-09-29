@@ -85,10 +85,26 @@ internal network and sites/logs volume names with that prefix. It cannot be used
 against the production `db` alias. Production's verified network is
 `frappe_docker_default`; supply that exact network after checking the live mounts.
 
-Production sets maintenance, stops frontend/WebSocket ingress and scheduling,
-and suspends dequeue using the verified RQ 2.6.1 API without an expiring TTL.
-It then gracefully stops the backend and invokes
-`docker compose stop --timeout -1 queue-long queue-short`. RQ handles the first
+Production sets maintenance and uses the same service shutdown procedure for
+deployment and rollback. It marks frontend as manually stopped with Docker's
+non-terminating `CONT` signal, then runs native `nginx -s quit` to close listeners.
+It stops WebSocket next so existing upgraded connections can close, then waits
+at most 120 seconds for frontend exit 0 with no restart. Scheduler receives
+SIGINT, its verified Python/Click shutdown path (exit 1); backend receives TERM
+with 120 seconds of grace. Each stage is checked before continuing.
+
+The original r5 WebSocket runs Node as PID 1; its default signal handler resets
+then re-raises TERM/INT, which Linux ignores for namespace init. Isolated tests
+confirmed exit 137 after timeout, versus exit 143 with Docker init. One explicit
+legacy retirement is allowed only after successful nginx QUIT, for the exact
+immutable r5 image ID, original Node command and PID 1 argv, with Docker init
+disabled. `docker stop --time 0` intentionally terminates that known legacy
+WebSocket. Requested/completed evidence records its container ID and exit 137;
+this exception cannot apply to other containers, OOM, backend, or workers.
+The general exit-137 gate remains strict. No forced frontend termination occurs.
+
+Before backend shutdown, dequeue is suspended using the verified RQ 2.6.1 API
+without an expiring TTL. Workers receive TERM with `--time -1`. RQ handles the first
 SIGTERM as warm shutdown, finishing each current job; Docker waits indefinitely
 without SIGKILL and suppresses automatic container restart. Do not send a second
 signal or repeat the command while a long job is finishing. Waiting only for an
@@ -96,8 +112,16 @@ idle/suspended state is insufficient because RQ can remain in blocking dequeue.
 The release refuses a pre-existing queue suspension and records its own Redis
 owner marker so recovery cannot resume another operator's pause.
 
-All six app containers must be stopped without forced termination before a
-fresh full backup or metadata snapshot. Disposable r5 containers use the
+All six app containers must be stopped and verified before a fresh full backup
+or metadata snapshot, with only the exact legacy WebSocket exception above.
+The candidate Compose override sets `init: true` for all six application services.
+The pinned base image's declared PyYAML dependency parses the old override without
+network or printing its contents; the published, hashed release script changes
+only application image/init keys. A full resolved Compose comparison rejects any
+other semantic change. Runtime checks require Docker `HostConfig.Init=true` for
+every candidate application container. The exact original override bytes remain
+available and are restored on rollback, including its original init settings.
+Disposable r5 containers use the
 verified production network and the backend's exact sites/logs volumes to run
 Bench backup and metadata operations. Backup copies are read directly from the
 sites volume with read-only mounts in a networkless container; they do not

@@ -21,6 +21,7 @@ SITES = BENCH + "/sites"
 PYTHON = BENCH + "/env/bin/python"
 SERVICES = ["backend", "frontend", "websocket", "queue-long", "queue-short", "scheduler"]
 BACKGROUND = ["scheduler", "queue-long", "queue-short"]
+LEGACY_BASE_ID = "sha256:944e83eb7c7f495e8a889c8b1d7ca97f7b8fe88bbe8ed0e7b3c8acdd5ed9899f"
 TOOLS = ["release.py", "release.sh", "release.env", "metadata.py", "verify_code.py", "check_health.py", "validate_backup.py", "Dockerfile", ".dockerignore"]
 os.umask(0o077)
 os.chdir(ROOT)
@@ -32,10 +33,10 @@ def required(key):
     return value
 
 
-def run(arguments, *, capture=False, input=None, check=True):
+def run(arguments, *, capture=False, input=None, check=True, timeout=None):
     # Credentials are only passed in protected files, never these arguments.
     print("+ " + shlex.join([str(arg) for arg in arguments]), flush=True)
-    result = subprocess.run([str(arg) for arg in arguments], input=input, stdout=subprocess.PIPE if capture else None, stderr=subprocess.STDOUT if capture else None, check=False)
+    result = subprocess.run([str(arg) for arg in arguments], input=input, stdout=subprocess.PIPE if capture else None, stderr=subprocess.STDOUT if capture else None, check=False, timeout=timeout)
     if check and result.returncode:
         if capture:
             print(result.stdout.decode(errors="replace"))
@@ -103,10 +104,13 @@ def verify(target, manifest, image=False, **options):
     run(command)
 
 
-def running(expected_image, expected_id, services=SERVICES):
+def running(expected_image, expected_id, services=SERVICES, *, init=None):
     for service in services:
         actual = inspection(required("PROJECT") + "-" + service + "-1")
         assert actual["State"]["Running"] and actual["Config"]["Image"] == expected_image and actual["Image"] == expected_id, "service_version:" + service
+        if init is not None:
+            expected_init = init if isinstance(init, bool) else init[service]
+            assert bool(actual["HostConfig"].get("Init")) == expected_init, "service_init:" + service
 
 
 def prepare():
@@ -250,9 +254,9 @@ def rehearse():
     print("ISOLATED_DATABASE_UPGRADE_IDEMPOTENCY_AND_ROLLBACK_OK; resources retained")
 
 
-def compose():
+def compose(override=None):
     project = Path(required("PROJECT_PATH"))
-    return ["docker", "compose", "--env-file", project / "production.env", "-f", project / "compose.production.yaml", "-f", project / "build/zh-cn/compose.zh-cn.yaml", "-p", required("PROJECT")]
+    return ["docker", "compose", "--env-file", project / "production.env", "-f", project / "compose.production.yaml", "-f", override or project / "build/zh-cn/compose.zh-cn.yaml", "-p", required("PROJECT")]
 
 
 def bench(*arguments):
@@ -273,6 +277,72 @@ def stopped(services):
         actual = inspection(required("PROJECT") + "-" + service + "-1")
         assert not actual["State"]["Running"], "service_still_running:" + service
         assert actual["State"]["ExitCode"] != 137 and not actual["State"].get("OOMKilled"), "service_did_not_stop_gracefully:" + service
+
+
+def container_name(service):
+    return required("PROJECT") + "-" + service + "-1"
+
+
+def stop_service(service, signal="SIGTERM", grace=120):
+    if inspection(container_name(service))["State"]["Running"]:
+        run(["docker", "stop", "--signal", signal, "--time", str(grace), container_name(service)])
+    stopped([service])
+
+
+def stopped_apps(retirement):
+    stopped([service for service in SERVICES if service != "websocket"])
+    actual = inspection(container_name("websocket"))
+    if retirement and actual["Id"] == retirement["container_id"]:
+        assert actual["Image"] == LEGACY_BASE_ID and not actual["HostConfig"].get("Init"), "legacy_retirement_identity_changed"
+        assert not actual["State"]["Running"] and actual["State"]["ExitCode"] == 137 and not actual["State"].get("OOMKilled"), "legacy_retirement_state_changed"
+    else:
+        stopped(["websocket"])
+
+
+def stop_app_services(retirement, *, allow_legacy=False, pause_queues=None):
+    frontend = inspection(container_name("frontend"))
+    if frontend["State"]["Running"]:
+        # CONT is non-terminating for both legacy Bash PID 1 and Docker init.
+        # Docker records a manual stop before the native nginx master exits.
+        run(["docker", "kill", "--signal", "CONT", container_name("frontend")])
+        run(["docker", "exec", container_name("frontend"), "nginx", "-s", "quit"])
+
+    websocket = inspection(container_name("websocket"))
+    if websocket["State"]["Running"] and not websocket["HostConfig"].get("Init"):
+        command = ["node", BENCH + "/apps/frappe/socketio.js"]
+        assert allow_legacy and frontend["State"]["Running"], "legacy_websocket_retirement_not_authorized"
+        assert websocket["Image"] == LEGACY_BASE_ID and websocket["Config"]["Image"] == required("BASE_IMAGE"), "legacy_websocket_image_mismatch"
+        assert websocket["Config"]["Cmd"] == command, "legacy_websocket_command_mismatch"
+        pid1 = json.loads(run(["docker", "exec", container_name("websocket"), PYTHON, "-c", "import json,pathlib; print(json.dumps(pathlib.Path('/proc/1/cmdline').read_bytes().rstrip(b'\\0').decode().split('\\0')))"], capture=True))
+        assert pid1 == command, "legacy_websocket_pid1_mismatch"
+        # Only the proven r5 Node-as-PID-1 runtime needs explicit retirement.
+        # QUIT has already closed nginx listeners; closing old WS connections
+        # now lets nginx finish draining existing HTTP requests.
+        record = {"container_id": websocket["Id"], "image_id": websocket["Image"], "pid1": pid1, "action": "explicit_legacy_websocket_retirement", "frontend_quit_sent": True}
+        save("legacy-websocket-retirement.requested.json", record)
+        run(["docker", "stop", "--time", "0", container_name("websocket")])
+        actual = inspection(container_name("websocket"))
+        assert actual["Id"] == record["container_id"] and not actual["State"]["Running"] and actual["State"]["ExitCode"] == 137 and not actual["State"].get("OOMKilled"), "legacy_websocket_retirement_failed"
+        retirement.update(record)
+        save("legacy-websocket-retirement.json", {**record, "exit_code": 137, "oom_killed": False})
+    elif websocket["State"]["Running"]:
+        stop_service("websocket")
+    elif not retirement or websocket["Id"] != retirement["container_id"]:
+        stopped(["websocket"])
+
+    if frontend["State"]["Running"]:
+        assert run(["docker", "wait", container_name("frontend")], capture=True, timeout=120) == "0", "frontend_shutdown_exit"
+    actual = inspection(container_name("frontend"))
+    stopped(["frontend"])
+    assert actual["Id"] == frontend["Id"] and actual["State"]["ExitCode"] == 0 and actual["RestartCount"] == frontend["RestartCount"], "frontend_shutdown_not_exact"
+    stop_service("scheduler", signal="SIGINT")
+    if pause_queues:
+        pause_queues()
+    stop_service("backend")
+    print("Waiting for existing queue jobs to finish; no forced worker termination", flush=True)
+    for service in ("queue-long", "queue-short"):
+        stop_service(service, grace=-1)
+    stopped_apps(retirement)
 
 
 def copy_backup(image, mounts, inside_backup, backup_dir):
@@ -323,10 +393,22 @@ def check_logs(started, services, filename):
     assert not re.search(r"Traceback \(most recent call last\)|(^|\s)(ERROR|CRITICAL)([\s:]|$)", logs, re.MULTILINE), "post_deployment_log_error"
 
 
-def switch_override(path, old, new, count):
-    content = path.read_text()
-    assert content.count(old) == count and count > 0, "compose_image_count_changed"
-    path.write_text(content.replace(old, new))
+def prepare_override(path, old, new, configuration):
+    # Parse using the pinned Frappe image's declared PyYAML dependency. YAML and
+    # resolved configuration contents stay captured; never print site secrets.
+    parser = "import json,sys,yaml\ntry:\n print(json.dumps(yaml.safe_load(sys.stdin.read())))\nexcept Exception:\n raise SystemExit('override_yaml_parse_failed')"
+    content = json.loads(run(["docker", "run", "--rm", "-i", "--network", "none", "--entrypoint", PYTHON, old, "-c", parser], capture=True, input=path.read_bytes()))
+    for service in SERVICES:
+        assert content["services"][service]["image"] == old, "override_image_changed:" + service
+        content["services"][service].update(image=new, init=True)
+    target = ROOT / "compose.override.candidate.json"
+    save(target, content)
+    planned = json.loads(run(compose(target) + ["config", "--format", "json"], capture=True))
+    expected = json.loads(json.dumps(configuration))
+    for service in SERVICES:
+        expected["services"][service].update(image=new, init=True)
+    assert planned == expected, "candidate_compose_changes_outside_images_and_init"
+    return target
 
 
 def deploy():
@@ -347,6 +429,9 @@ def deploy():
     assert network in inspection(backend)["NetworkSettings"]["Networks"], "unexpected_production_network"
     configuration = json.loads(run(compose() + ["config", "--format", "json"], capture=True))
     assert all(configuration["services"][name]["image"] == base for name in SERVICES)
+    original_init = {name: bool(configuration["services"][name].get("init")) for name in SERVICES}
+    running(base, saved["base_id"], init=original_init)
+    candidate_override = prepare_override(override, base, candidate, configuration)
     run(["python3", "check_health.py", backend, required("SITE")])
     for service in ("backend", "frontend"):
         verify(required("PROJECT") + "-" + service + "-1", "baseline-sources.json", assets_match="baseline-assets.json")
@@ -359,7 +444,6 @@ def deploy():
     db_host = run(["docker", "exec", backend, PYTHON, "-c", "import json,pathlib; r=pathlib.Path('/home/frappe/frappe-bench/sites'); c=json.loads((r/'common_site_config.json').read_text()); c.update(json.loads((r/" + repr(required("SITE")) + "/'site_config.json').read_text())); assert not c.get('maintenance_mode'); print(c['db_host'])"], capture=True)
     before = {str(path): sha(path) for path in (project_path / "compose.production.yaml", project_path / "production.env", override)}
     shutil.copy2(override, "compose.override.before.yaml")
-    count = override.read_text().count(base)
     backup_dir = project_path / "build/production-backups" / required("RELEASE_NAME")
     assert not backup_dir.exists()
     backup_dir.mkdir(mode=0o700)
@@ -372,6 +456,7 @@ def deploy():
     mutation_started = False
     traffic_open = False
     queue_paused = False
+    retirement = {}
     phase = "quiesce"
 
     def maintenance(image, enabled, *, check=True):
@@ -380,22 +465,14 @@ def deploy():
             print(output)
         return output
 
-    try:
-        bench("set-maintenance-mode", "on")
-        # The maintenance flag is cached for 60 seconds in existing workers.
-        # Close ingress first, then let in-flight writers finish before backup.
-        run(compose() + ["stop", "--timeout", "120", "frontend", "websocket"])
-        run(compose() + ["stop", "--timeout", "120", "scheduler"])
+    def pause_queues():
+        nonlocal queue_paused
         queue_paused = True
         queue_control(base, "pause", network, mounts, db_host)
-        run(compose() + ["stop", "--timeout", "120", "backend"])
-        stopped(["frontend", "websocket", "scheduler", "backend"])
-        # RQ's first SIGTERM is warm: a busy worker finishes its current job.
-        # Infinite Docker grace forbids a later forced SIGKILL; do not send a
-        # second signal or repeat this command while it is waiting.
-        print("Waiting for existing queue jobs to finish; no forced worker termination", flush=True)
-        run(compose() + ["stop", "--timeout", "-1", "queue-long", "queue-short"])
-        stopped(SERVICES)
+
+    try:
+        bench("set-maintenance-mode", "on")
+        stop_app_services(retirement, allow_legacy=True, pause_queues=pause_queues)
         phase = "backup"
         print(one_shot(base, network, mounts, "bench", ["--site", required("SITE"), "backup", "--with-files", "--compress", "--backup-path", inside_backup]))
         copy_backup(base, mounts, inside_backup, backup_dir)
@@ -406,7 +483,7 @@ def deploy():
         metadata(candidate, "migrate", snapshot, network, mounts, db_host)
         for path, expected in before.items():
             assert sha(path) == expected, "production_configuration_drift"
-        switch_override(override, base, candidate, count)
+        shutil.copyfile(candidate_override, override)
         run(compose() + ["config", "--quiet"])
         run(compose() + ["up", "-d", "--no-deps", "--force-recreate", "--pull", "never", "backend", "frontend", "websocket"])
         bench("clear-cache")
@@ -414,7 +491,7 @@ def deploy():
         for service in ("backend", "frontend"):
             verify(required("PROJECT") + "-" + service + "-1", "candidate-sources.json", assets_match="candidate-assets.json")
         metadata(candidate, "validate", snapshot, network, mounts, db_host)
-        running(candidate, saved["candidate_id"], ["backend", "frontend", "websocket"])
+        running(candidate, saved["candidate_id"], ["backend", "frontend", "websocket"], init=True)
         stopped(BACKGROUND)
         check_logs(started, ["backend", "frontend", "websocket"], "services.before-traffic.log")
         # Set this boundary before the command: even an interrupted CLI may
@@ -426,7 +503,7 @@ def deploy():
         run(["python3", "check_health.py", backend, required("SITE"), "--maintenance-cleared"])
         phase = "background_start"
         run(compose() + ["up", "-d", "--no-deps", "--force-recreate", "--pull", "never", *BACKGROUND])
-        running(candidate, saved["candidate_id"])
+        running(candidate, saved["candidate_id"], init=True)
         check_logs(started, SERVICES, "services.after.log")
         queue_control(candidate, "resume", network, mounts, db_host)
         queue_paused = False
@@ -455,8 +532,7 @@ def deploy():
         try:
             # Never continue workers while source and metadata are from different releases.
             maintenance(base, True)
-            run(compose() + ["stop", "--timeout", "120", *SERVICES])
-            stopped(SERVICES)
+            stop_app_services(retirement)
             if snapshot.exists():
                 metadata(base, "restore", snapshot, network, mounts, db_host)
             shutil.copy2("compose.override.before.yaml", override)
@@ -466,12 +542,12 @@ def deploy():
             bench("clear-website-cache")
             for service in ("backend", "frontend"):
                 verify(required("PROJECT") + "-" + service + "-1", "baseline-sources.json", assets_match="baseline-assets.json")
-            running(base, saved["base_id"], ["backend", "frontend", "websocket"])
+            running(base, saved["base_id"], ["backend", "frontend", "websocket"], init=original_init)
             check_logs(started, ["backend", "frontend", "websocket"], "services.rollback.log")
             maintenance(base, False)
             run(["python3", "check_health.py", backend, required("SITE"), "--maintenance-cleared"])
             run(compose() + ["up", "-d", "--no-deps", "--force-recreate", "--pull", "never", *BACKGROUND])
-            running(base, saved["base_id"])
+            running(base, saved["base_id"], init=original_init)
             if queue_paused:
                 queue_control(base, "resume", network, mounts, db_host)
                 queue_paused = False
