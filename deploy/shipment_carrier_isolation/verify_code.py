@@ -117,7 +117,7 @@ def main():
             # that exact immutable image and verify every tracked Shipping file.
             actual_image = inspection.get("Image") or inspection.get("Id")
             assert actual_image == "sha256:944e83eb7c7f495e8a889c8b1d7ca97f7b8fe88bbe8ed0e7b3c8acdd5ed9899f"
-            assert sources[app]["sha"] == "3a888e600275953d06239b112be9cd107de043c7"
+            assert sources[app]["sha"] == "33ed4db56cd29b61a67e5b09df6cfb3783166709"
         else:
             assert labels.get(label) == sources[app]["sha"], ("revision_label_mismatch", app)
     command = (

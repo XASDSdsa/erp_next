@@ -24,9 +24,16 @@ bash release.sh deploy
 
 `release.env` fixes the verified baseline commits and DB/Redis image IDs. Target
 branch tips must equal the three target commits at preparation and deployment.
-Shipping baseline is **3a888e6**, its recorded production source; 5f852ca only
-removed a CI workflow. Baseline checks compare every tracked file, without
-skipping that workflow or substituting a newer SHA.
+Shipping baseline is **33ed4db56cd29b61a67e5b09df6cfb3783166709**, an archival
+commit on `archive/r5-shipping-source-20260929` reproducing the immutable r5 source.
+A read-only comparison of all 63 tracked files showed 62 match 5f852ca and
+`utils.py` contains the historical unconditional delegation to SF's validator.
+The latter SHA-256 is `184d51c898e0d0c5532981529900844cac49721221b7d0dc64f0e6b8818d97ef`
+in both the immutable image and running backend. The earlier 3a888e6 source
+record was inaccurate (it also included a now-absent CI workflow). Do not reuse
+that record. Every source file is checked against the archive without exclusions.
+The r5 Shipping revision label is absent; only its exact verified image ID may
+use the archival source proof. The candidate must have all three revision labels.
 
 Preparation inherits r5 dependencies, overlays exact Git archives, removes all
 Git-deleted files, and runs `bench build --app erpnext --production --force`.
