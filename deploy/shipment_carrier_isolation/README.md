@@ -22,6 +22,14 @@ export PRODUCTION_NETWORK=<network-confirmed-on-current-backend-and-database>
 bash release.sh deploy
 ```
 
+Each new SSH shell must export the same five target variables again; exports
+from preparation do not persist into a later connection. Preparation checks the
+resolved Compose changes before building, and deployment repeats that check.
+The original override can use image substitutions such as `${ZH_IMAGE:-...}`.
+Preserve its entire mapping, including configurator and pull policies; update
+only the six application images and init settings after checking the resolved
+baseline image. Never replace the original mapping with a minimal override.
+
 `release.env` fixes the verified baseline commits and DB/Redis image IDs. Target
 branch tips must equal the three target commits at preparation and deployment.
 Shipping baseline is **33ed4db56cd29b61a67e5b09df6cfb3783166709**, an archival
@@ -66,6 +74,10 @@ Rehearsal creates one **internal** Docker network with fresh MariaDB, Redis and
 sites/logs/DB volumes. It imports only the backup copy; no production mount,
 network, worker, scheduler or published port is used. All DB/Redis settings in
 the copied site configuration are replaced by isolated endpoints. The backup
+import waits for a successful TCP `SELECT 1` returning exactly `1`. MariaDB's
+temporary initialization server uses `--skip-networking`; a socket query can
+succeed there just before that temporary server stops. Readiness and import use
+the same TCP client, with the defaults file remaining the first client option.
 encryption key stays in protected files and is never printed. Isolation assets
 and stopped containers are retained for inspection after success or failure.
 The isolated site tree includes `<site>/logs`; the volume initializer assigns

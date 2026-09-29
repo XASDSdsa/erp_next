@@ -131,6 +131,10 @@ def prepare():
     base_id = image_id(base)
     running(base, base_id)
     assert run(["docker", "image", "inspect", candidate], capture=True, check=False).returncode != 0, "candidate_tag_already_exists"
+    # Resolve substitutions and preserve unrelated override settings before
+    # spending time on a build. deploy repeats this check against live config.
+    configuration = json.loads(run(compose() + ["config", "--format", "json"], capture=True))
+    prepare_override(Path(required("PROJECT_PATH")) / "build/zh-cn/compose.zh-cn.yaml", base, candidate, configuration)
     Path("git-source").mkdir()
     changed = {}
     for checkout, app, remote, revision, baseline in refs:
@@ -224,9 +228,12 @@ def rehearse():
     save(iso / "resources.json", {"network": net, "db": db, "redis": redis, "volumes": [prefix + suffix for suffix in ("-db", "-sites", "-logs")]})
     run(["docker", "run", "-d", "--name", db, "--network", net, "--env-file", iso / "db.env", "-v", prefix + "-db:/var/lib/mysql", "--mount", "type=bind,source=" + str(iso / "db.cnf") + ",target=/run/secrets/db.cnf,readonly", db_image])
     run(["docker", "run", "-d", "--name", redis, "--network", net, redis_image])
-    client = ["docker", "exec", "-i", db, "mariadb", "--defaults-extra-file=/run/secrets/db.cnf"]
+    # MariaDB's initialization server accepts socket queries but runs with
+    # --skip-networking. TCP proves the final server is ready for the import.
+    client = ["docker", "exec", "-i", db, "mariadb", "--defaults-extra-file=/run/secrets/db.cnf", "--protocol=TCP", "--host=127.0.0.1"]
     for attempt in range(60):
-        if run(client + ["-N", "-e", "SELECT 1"], capture=True, check=False).returncode == 0:
+        ready = run(client + ["-N", "-e", "SELECT 1"], capture=True, check=False)
+        if ready.returncode == 0 and ready.stdout.strip() == b"1":
             break
         time.sleep(1)
     else:
@@ -438,14 +445,17 @@ def check_logs(started, services, filename):
 def prepare_override(path, old, new, configuration):
     # Parse using the pinned Frappe image's declared PyYAML dependency. YAML and
     # resolved configuration contents stay captured; never print site secrets.
-    parser = "import json,sys,yaml\ntry:\n print(json.dumps(yaml.safe_load(sys.stdin.read())))\nexcept Exception:\n raise SystemExit('override_yaml_parse_failed')"
-    # The Chinese override may be empty; production.env supplies the resolved
-    # baseline image. Build a minimal override from the already resolved config,
-    # rather than guessing what an optional override file contains.
+    # Images may be Compose expressions, not literal tags. Preserve every
+    # unrelated setting and compare the resolved configuration instead.
     parser = "import json,sys,yaml\ntry:\n print(json.dumps(yaml.safe_load(sys.stdin.read()) or {}))\nexcept Exception:\n raise SystemExit('override_yaml_parse_failed')"
     parsed = json.loads(run(["docker", "run", "--rm", "-i", "--network", "none", "--entrypoint", PYTHON, old, "-c", parser], capture=True, input=path.read_bytes()))
-    assert parsed == {} or isinstance(parsed, dict), "override_yaml_shape_changed"
-    content = {"services": {service: {"image": new, "init": True} for service in SERVICES}}
+    assert isinstance(parsed, dict), "override_yaml_shape_changed"
+    content = parsed
+    services = content.setdefault("services", {})
+    assert isinstance(services, dict), "override_services_shape_changed"
+    for service in SERVICES:
+        assert configuration["services"][service]["image"] == old, "resolved_baseline_image_changed:" + service
+        services.setdefault(service, {}).update(image=new, init=True)
     target = ROOT / "compose.override.candidate.json"
     save(target, content)
     planned = json.loads(run(compose(target) + ["config", "--format", "json"], capture=True))
