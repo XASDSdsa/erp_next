@@ -72,9 +72,9 @@ def load_migration():
 	property_names = set().union(*(field.keys() for field in manual)) | {"hidden", "unique", "precision", "in_list_view", "collapsible"}
 	checks = {"allow_on_submit", "read_only", "no_copy", "hidden", "unique", "in_list_view", "collapsible"}
 	properties = [Field(fieldname=name, fieldtype="Check" if name in checks else "Data", default="0" if name in checks else None) for name in property_names]
-	permission_properties = [Field(fieldname=name, fieldtype="Check") for name in (
+	permission_properties = [Field(fieldname=name, fieldtype="Int" if name == "permlevel" else "Check") for name in (
 		"read", "write", "create", "submit", "share", "print", "email", "cancel", "amend",
-		"report", "delete", "import", "export", "select", "if_owner", "permlevel",
+		"report", "delete", "import", "export", "select", "if_owner", "permlevel", "mask",
 	)]
 	frappe.get_meta = lambda doctype: Field(fields=permission_properties if doctype == "Custom DocPerm" else properties)
 	spec = importlib.util.spec_from_file_location("shipment_metadata_migration_under_test", PATCH)
@@ -163,33 +163,41 @@ class TestShipmentMetadataMigration(unittest.TestCase):
 			row.setdefault("in_list_view", "0")
 		self.assertEqual(len(module.execute()["removed_custom_fields"]), 19)
 
-	def test_exact_single_legacy_permission_is_replaced_by_native_permissions(self):
+	def test_legacy_permission_without_child_table_columns_is_replaced_only_for_shipment(self):
 		module, frappe, store, manual = load_migration()
+		other = {"name": "other-sales", "parent": "Delivery Note", "role": "Sales User", **dict.fromkeys(module.SALES_USER_RIGHTS, 1)}
 		store.rows["Custom DocPerm"] = [{
-			"name": "legacy-sales", "parent": "Shipment", "parenttype": "DocType", "role": "Sales User",
+			"name": "legacy-sales", "parent": "Shipment", "role": "Sales User",
 			**dict.fromkeys(module.SALES_USER_RIGHTS, 1),
-		}]
+		}, other]
 		self.assertEqual(module.execute()["removed_custom_permissions"], ["legacy-sales"])
-		self.assertFalse(store.rows["Custom DocPerm"])
+		self.assertEqual(store.rows["Custom DocPerm"], [other])
+		self.assertFalse(module.execute()["removed_custom_permissions"])
 
 	def test_customer_permission_combinations_remain_intact(self):
 		for custom in ({"role": "Warehouse User", "read": 1}, {"role": "Sales User", "cancel": 1}):
 			with self.subTest(custom=custom):
 				module, frappe, store, manual = load_migration()
-				legacy = {"name": "legacy-sales", "parent": "Shipment", "parenttype": "DocType", "role": "Sales User", **dict.fromkeys(module.SALES_USER_RIGHTS, 1)}
+				legacy = {"name": "legacy-sales", "parent": "Shipment", "role": "Sales User", **dict.fromkeys(module.SALES_USER_RIGHTS, 1)}
 				store.rows["Custom DocPerm"] = [legacy, {"name": "customer-permission", "parent": "Shipment", **custom}]
 				before = copy.deepcopy(store.rows["Custom DocPerm"])
 				self.assertFalse(module.execute()["removed_custom_permissions"])
 				self.assertEqual(store.rows["Custom DocPerm"], before)
 
-	def test_customer_modified_single_sales_permission_is_not_deleted(self):
-		module, frappe, store, manual = load_migration()
-		store.rows["Custom DocPerm"] = [{
-			"name": "customer-sales", "parent": "Shipment", "parenttype": "DocType", "role": "Sales User",
-			**dict.fromkeys(module.SALES_USER_RIGHTS, 1), "cancel": 1,
-		}]
-		self.assertFalse(module.execute()["removed_custom_permissions"])
-		self.assertEqual(len(store.rows["Custom DocPerm"]), 1)
+	def test_nonmatching_single_permissions_are_not_deleted(self):
+		for changes in (
+			{"role": "Warehouse User"}, {"cancel": 1}, {"mask": 1}, {"if_owner": 1},
+			{"permlevel": 1}, {"read": 0}, {"export": 0}, {"parent": "Sales Order"},
+		):
+			with self.subTest(changes=changes):
+				module, frappe, store, manual = load_migration()
+				store.rows["Custom DocPerm"] = [{
+					"name": "customer-sales", "parent": "Shipment", "role": "Sales User",
+					**dict.fromkeys(module.SALES_USER_RIGHTS, 1), **changes,
+				}]
+				before = copy.deepcopy(store.rows["Custom DocPerm"])
+				self.assertFalse(module.execute()["removed_custom_permissions"])
+				self.assertEqual(store.rows["Custom DocPerm"], before)
 
 	def test_legacy_delivery_note_panel_is_replaced_by_native_layout(self):
 		module, frappe, store, manual = load_migration()

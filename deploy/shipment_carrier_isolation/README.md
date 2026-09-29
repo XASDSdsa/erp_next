@@ -53,6 +53,13 @@ network, worker, scheduler or published port is used. All DB/Redis settings in
 the copied site configuration are replaced by isolated endpoints. The backup
 encryption key stays in protected files and is never printed. Isolation assets
 and stopped containers are retained for inspection after success or failure.
+The isolated site tree includes `<site>/logs`; the volume initializer assigns
+both sites and bench logs volumes to the image's `frappe` user. Direct Frappe
+Python entry points run from `/home/frappe/frappe-bench/sites`, matching native
+Bench behavior: Frappe logging resolves `../logs` and `<site>/logs` relative to
+the process directory even when `frappe.init` has an explicit `sites_path`.
+The metadata helper verifies both log directories before connecting to the DB;
+it does not create runtime directories in production to repair an invalid setup.
 
 The real restored database must pass: r5 metadata snapshot; candidate upgrade;
 native fields, effective Sales User permissions, provider choices, unique index,

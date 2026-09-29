@@ -17,6 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 BENCH = "/home/frappe/frappe-bench"
+SITES = BENCH + "/sites"
 PYTHON = BENCH + "/env/bin/python"
 SERVICES = ["backend", "frontend", "websocket", "queue-long", "queue-short", "scheduler"]
 BACKGROUND = ["scheduler", "queue-long", "queue-short"]
@@ -170,7 +171,7 @@ def metadata(image, mode, snapshot, network, mounts, db_host, *, check=True):
         assert inspection(network)["Internal"], "failure_injection_requires_internal_network"
         assert all(str(source).startswith("shipment-check-") for source, _ in mounts), "failure_injection_requires_isolated_volumes"
     snapshot = Path(snapshot).resolve()
-    command = ["docker", "run", "--rm", "--network", network, "--user", "frappe", "--workdir", BENCH]
+    command = ["docker", "run", "--rm", "--network", network, "--user", "frappe", "--workdir", SITES]
     for source, destination in mounts:
         command += ["--mount", "type=" + ("bind" if str(source).startswith("/") else "volume") + ",source=" + str(source) + ",target=" + destination]
     command += ["--mount", "type=bind,source=" + str(ROOT) + ",target=/run/release,readonly", "--mount", "type=bind,source=" + str(snapshot.parent) + ",target=/capture", "--entrypoint", PYTHON, image, "/run/release/metadata.py", mode, "--site", required("SITE"), "--snapshot", "/capture/" + snapshot.name, "--db-host", db_host]
@@ -227,11 +228,11 @@ def rehearse():
     isolated_connections = {"db_host": db, "redis_cache": "redis://" + redis + ":6379/0", "redis_queue": "redis://" + redis + ":6379/1", "redis_socketio": "redis://" + redis + ":6379/2"}
     conf.update(**isolated_connections, db_name="shipment_check", db_user="shipment_check", db_password=password, maintenance_mode=1, pause_scheduler=1)
     config_dir = iso / "sites"
-    (config_dir / site).mkdir(parents=True)
+    (config_dir / site / "logs").mkdir(parents=True)
     save(config_dir / site / "site_config.json", conf)
     save(config_dir / "common_site_config.json", {**isolated_connections, "pause_scheduler": 1})
     (config_dir / "apps.txt").write_text(run(["docker", "run", "--rm", "--network", "none", "--entrypoint", "cat", required("BASE_IMAGE"), BENCH + "/sites/apps.txt"], capture=True) + "\n")
-    run(["docker", "run", "--rm", "--network", "none", "--user", "root", "--mount", "type=bind,source=" + str(config_dir) + ",target=/run/sites,readonly", "-v", prefix + "-sites:" + BENCH + "/sites", "--entrypoint", "/bin/bash", required("BASE_IMAGE"), "-c", "cp -a /run/sites/. /home/frappe/frappe-bench/sites/ && chown -R frappe:frappe /home/frappe/frappe-bench/sites"])
+    run(["docker", "run", "--rm", "--network", "none", "--user", "root", "--mount", "type=bind,source=" + str(config_dir) + ",target=/run/sites,readonly", "-v", prefix + "-sites:" + SITES, "-v", prefix + "-logs:" + BENCH + "/logs", "--entrypoint", "/bin/bash", required("BASE_IMAGE"), "-c", "cp -a /run/sites/. /home/frappe/frappe-bench/sites/ && chown -R frappe:frappe /home/frappe/frappe-bench/sites /home/frappe/frappe-bench/logs"])
     mounts = [(prefix + "-sites", BENCH + "/sites"), (prefix + "-logs", BENCH + "/logs")]
     snapshot = capture_directory(iso / "captures") / "before.json"
     metadata(required("BASE_IMAGE"), "snapshot", snapshot, net, mounts, db)
@@ -258,8 +259,8 @@ def bench(*arguments):
     run(["docker", "exec", "--user", "frappe", "--workdir", BENCH, required("PROJECT") + "-backend-1", "bench", "--site", required("SITE"), *arguments])
 
 
-def one_shot(image, network, mounts, entrypoint, arguments, *, check=True, extra_mounts=(), readonly=False, user="frappe"):
-    command = ["docker", "run", "--rm", "--network", network, "--user", user, "--workdir", BENCH]
+def one_shot(image, network, mounts, entrypoint, arguments, *, check=True, extra_mounts=(), readonly=False, user="frappe", workdir=BENCH):
+    command = ["docker", "run", "--rm", "--network", network, "--user", user, "--workdir", workdir]
     for source, destination in mounts:
         command += ["--mount", "type=" + ("bind" if str(source).startswith("/") else "volume") + ",source=" + str(source) + ",target=" + destination + (",readonly" if readonly else "")]
     for mount in extra_mounts:
@@ -313,7 +314,7 @@ else:
 print('QUEUE_' + mode.upper() + '_OK')
 frappe.destroy()
 '''
-    print(one_shot(image, network, mounts, PYTHON, ["-c", script, required("SITE"), db_host, mode, required("RELEASE_NAME")]))
+    print(one_shot(image, network, mounts, PYTHON, ["-c", script, required("SITE"), db_host, mode, required("RELEASE_NAME")], workdir=SITES))
 
 
 def check_logs(started, services, filename):

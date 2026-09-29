@@ -21,6 +21,7 @@ BUSINESS = DOCTYPES + [
 ]
 PATCH = "erpnext.patches.v16_0.move_shipment_carrier_metadata.execute"
 SF_SYNC = "sf_international.install.ensure_sf_shipment_metadata"
+SITES = Path("/home/frappe/frappe-bench/sites")
 
 
 def encoded(value):
@@ -132,7 +133,13 @@ def main():
     # Reject failure injection before initializing or connecting to any site.
     if args.mode == "fail-after-parcel":
         assert args.db_host.startswith("shipment-check-"), "failure_injection_requires_isolated_database"
-    frappe.init(args.site, sites_path="/home/frappe/frappe-bench/sites")
+    args.snapshot = args.snapshot.resolve()
+    # Frappe's native logger resolves ../logs and <site>/logs from cwd;
+    # an explicit sites_path in init() does not change that working directory.
+    os.chdir(SITES)
+    for directory in (SITES.parent / "logs", SITES / args.site / "logs"):
+        assert directory.is_dir() and os.access(directory, os.W_OK), "missing_or_unwritable_log_directory:" + str(directory)
+    frappe.init(args.site, sites_path=str(SITES))
     assert frappe.conf.db_host == args.db_host, "unexpected_database_host"
     if args.db_host.startswith("shipment-check-"):
         assert all((urlparse(frappe.conf.get(key) or "").hostname or "").startswith("shipment-check-") for key in ("redis_cache", "redis_queue", "redis_socketio")), "unexpected_isolation_redis_host"

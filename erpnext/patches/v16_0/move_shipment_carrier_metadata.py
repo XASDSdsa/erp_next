@@ -146,7 +146,9 @@ def _remove_legacy_sales_permission():
 	if len(rows) != 1:
 		return []
 	row = rows[0]
-	if row.get("role") != "Sales User" or row.get("parenttype") != "DocType":
+	# Custom DocPerm is a standalone DocType with an explicit parent field;
+	# it has no child-table parenttype column. The query already scopes Shipment.
+	if row.get("role") != "Sales User":
 		return []
 	for field in frappe.get_meta("Custom DocPerm").fields:
 		if field.fieldtype in ("Check", "Int"):
