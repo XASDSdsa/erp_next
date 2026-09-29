@@ -32,6 +32,16 @@ def digest(value):
     return hashlib.sha256(encoded(value)).hexdigest()
 
 
+def clear_runtime_cache():
+    # Images share a site's Redis, so app_hooks can still belong to the previous
+    # image. Evict both client and Redis copies before global clear_cache itself
+    # resolves its hook callbacks. Frappe's global clear does not reset the
+    # process-local document event map; its installer explicitly resets this too.
+    frappe.client_cache.delete_value("app_hooks")
+    frappe.local.doc_events_hooks = None
+    frappe.clear_cache()
+
+
 def business():
     result = {}
     for doctype in BUSINESS:
@@ -118,7 +128,7 @@ def restore(snapshot):
         fields = list(group["rows"][0])
         frappe.db.bulk_insert(group["doctype"], fields, [tuple(row[field] for field in fields) for row in group["rows"]])
     frappe.db.commit()
-    frappe.clear_cache()
+    clear_runtime_cache()
     assert encoded(capture()) == encoded(snapshot), "metadata_restore_not_exact"
     print("EXACT_METADATA_ROLLBACK_OK")
 
@@ -146,6 +156,9 @@ def main():
     frappe.connect()
     frappe.set_user("Administrator")
     try:
+        # Run every mode with this image's hooks, including baseline snapshot /
+        # restore after a candidate process and standalone candidate validation.
+        clear_runtime_cache()
         if args.mode == "snapshot":
             assert not args.snapshot.exists(), "snapshot_exists"
             temporary = args.snapshot.with_suffix(".pending")
@@ -176,6 +189,9 @@ def main():
             before = semantic(capture())
             results = [frappe.get_attr(PATCH)(), frappe.get_attr(SF_SYNC)()]
             frappe.db.commit()
+            # Reload committed metadata before exercising document onload. The
+            # narrow patch's DocType clears do not invalidate global app hooks.
+            clear_runtime_cache()
             validate(snapshot)
             after = semantic(capture())
             print(json.dumps({"result": "MIGRATION_OK", "before": before, "after": after, "actions": results}, default=json_handler))

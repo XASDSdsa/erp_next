@@ -60,6 +60,15 @@ Bench behavior: Frappe logging resolves `../logs` and `<site>/logs` relative to
 the process directory even when `frappe.init` has an explicit `sites_path`.
 The metadata helper verifies both log directories before connecting to the DB;
 it does not create runtime directories in production to repair an invalid setup.
+Each metadata invocation clears the site's cached application hooks and current
+process document-event map before invoking native global `frappe.clear_cache()`.
+Baseline and candidate containers share that site's Redis, so changing images
+alone cannot update `app_hooks`. The explicit hook eviction also ensures native
+cache-clearing callbacks resolve from the running image. The same sequence runs
+after migration commit before document onload validation and after exact metadata
+restoration before its comparison. Standalone validate and baseline snapshot /
+restore therefore cannot reuse the other image's document hooks. This performs
+native cache invalidation; it does not run app installers or migration hooks.
 
 The real restored database must pass: r5 metadata snapshot; candidate upgrade;
 native fields, effective Sales User permissions, provider choices, unique index,
