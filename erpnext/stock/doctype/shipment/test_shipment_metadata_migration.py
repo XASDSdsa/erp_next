@@ -220,6 +220,46 @@ class TestShipmentMetadataMigration(unittest.TestCase):
 		self.assertFalse(store.deleted)
 		frappe.reload_doc.assert_not_called()
 
+	def test_verified_delivery_note_label_setters_are_removed_before_legacy_fields_and_are_idempotent(self):
+		module, frappe, store, manual = load_migration()
+		store.rows["Custom Field"] = legacy_fields(module.LEGACY_DELIVERY_NOTE_FIELDS, "Delivery Note", "tracking_status_info")
+		store.rows["Property Setter"] = [
+			{**setter("Delivery Note-" + field["fieldname"] + "-label", field["fieldname"], "label", field["label"], doctype="Delivery Note"), "property_type": "Data"}
+			for field in module.LEGACY_DELIVERY_NOTE_FIELDS
+		]
+		expected_names = [row["name"] for row in store.rows["Property Setter"]]
+		unrelated = setter("customer-native-panel", "shipping_details", "label", "Our shipping", generated=0, doctype="Delivery Note")
+		store.rows["Property Setter"].append(unrelated)
+		result = module.execute()
+		self.assertEqual(result["removed_property_setters"], expected_names)
+		self.assertEqual(len(result["removed_custom_fields"]), 2)
+		self.assertEqual(store.rows["Property Setter"], [unrelated])
+		self.assertFalse(store.rows["Custom Field"])
+		self.assertEqual([doctype for doctype, _ in store.deleted], ["Property Setter", "Property Setter", "Custom Field", "Custom Field"])
+		self.assertEqual(module.execute(), self.EMPTY_RESULT)
+		self.assertEqual(len(store.deleted), 4)
+
+	def test_nonmatching_delivery_note_label_setters_stop_before_any_mutation(self):
+		for changes in (
+			{"is_system_generated": 0}, {"is_system_generated": None}, {"property_type": "Text"},
+			{"property": "description"}, {"value": "Customer label"}, {"value": ""},
+		):
+			with self.subTest(changes=changes):
+				module, frappe, store, manual = load_migration()
+				store.rows["Custom Field"] = legacy_fields(manual) + legacy_fields(module.LEGACY_DELIVERY_NOTE_FIELDS, "Delivery Note", "tracking_status_info")
+				store.rows["Property Setter"] = [
+					{**setter("Delivery Note-" + field["fieldname"] + "-label", field["fieldname"], "label", field["label"], doctype="Delivery Note"), "property_type": "Data"}
+					for field in module.LEGACY_DELIVERY_NOTE_FIELDS
+				]
+				store.rows["Property Setter"][1].update(changes)
+				before = copy.deepcopy(store.rows)
+				with self.assertRaisesRegex(ValueError, "Delivery Note-sf_dn_actions_html-label"):
+					module.execute()
+				self.assertEqual(store.rows, before)
+				self.assertFalse(store.deleted)
+				self.assertFalse(store.updated)
+				frappe.reload_doc.assert_not_called()
+
 	def test_delivery_note_customer_layout_reference_is_not_orphaned(self):
 		module, frappe, store, manual = load_migration()
 		store.rows["Custom Field"] = legacy_fields(module.LEGACY_DELIVERY_NOTE_FIELDS, "Delivery Note", "tracking_status_info")

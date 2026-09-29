@@ -91,18 +91,32 @@ def _check_custom_fields(native_fields, doctype="Shipment", first_after="service
 def _check_delivery_note_fields():
 	rows = _check_custom_fields(LEGACY_DELIVERY_NOTE_FIELDS, "Delivery Note", "tracking_status_info")
 	if not rows:
-		return []
+		return [], []
 	fieldnames = [row["fieldname"] for row in rows]
 	overrides = frappe.get_all(
 		"Property Setter",
 		filters={"doc_type": "Delivery Note", "field_name": ["in", fieldnames]},
-		fields=["name"],
+		fields=["name", "field_name", "property", "property_type", "value", "is_system_generated"],
 	)
-	if overrides:
+	labels = {field["fieldname"]: field["label"] for field in LEGACY_DELIVERY_NOTE_FIELDS}
+	legacy_setters, customer_overrides = [], []
+	for row in overrides:
+		# The former installer repeated these exact labels as generated Data setters.
+		# Keep every other override protected, including a customer's identical label.
+		if (
+			row.get("is_system_generated") == 1
+			and row.get("property") == "label"
+			and row.get("property_type") == "Data"
+			and row.get("value") == labels[row["field_name"]]
+		):
+			legacy_setters.append(row)
+		else:
+			customer_overrides.append(row)
+	if customer_overrides:
 		frappe.throw(
 			"Delivery Note shipping metadata migration stopped before making changes. Move these "
 			"customer overrides to shipping_section/shipping_details before retrying: "
-			+ ", ".join(row["name"] for row in overrides)
+			+ ", ".join(row["name"] for row in customer_overrides)
 		)
 	layouts = frappe.get_all("DocType Layout", filters={"document_type": "Delivery Note"}, fields=["name"])
 	if layouts:
@@ -117,7 +131,7 @@ def _check_delivery_note_fields():
 				"customer layout rows to shipping_section/shipping_details before retrying: "
 				+ ", ".join(row["name"] for row in layout_fields)
 			)
-	return rows
+	return rows, legacy_setters
 
 
 def _legacy_property_setters():
@@ -192,8 +206,12 @@ def _retire_sales_order_list_scripts():
 def execute():
 	"""Idempotently transfer metadata; keep columns, unique indexes and business rows."""
 	custom_fields = _check_custom_fields(_native_manual_fields())
-	delivery_note_fields = _check_delivery_note_fields()
+	delivery_note_fields, delivery_note_setters = _check_delivery_note_fields()
 	sales_order_fields = _sales_order_freight_fields()
+	removed_setters = []
+	for row in delivery_note_setters:
+		frappe.db.delete("Property Setter", {"name": row["name"], "doc_type": "Delivery Note"})
+		removed_setters.append(row["name"])
 	removed_fields = []
 	for row in [*custom_fields, *delivery_note_fields]:
 		# CustomField.on_trash removes customer Property Setters and DocType Layout
@@ -201,7 +219,6 @@ def execute():
 		frappe.db.delete("Custom Field", {"name": row["name"], "dt": row["dt"]})
 		removed_fields.append(row["name"])
 
-	removed_setters = []
 	for doctype, fieldname, property_name, expected in _legacy_property_setters():
 		for row in frappe.get_all(
 			"Property Setter",
