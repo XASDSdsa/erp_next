@@ -1,4 +1,4 @@
-"""Customer stickers require real, valued stock; other products retain native policy."""
+"""Customer stickers require real stock; valuation follows native ledger policy."""
 from collections import defaultdict
 from html import escape
 
@@ -116,8 +116,8 @@ def validate_delivery_sticker_stock(doc, method=None):
         if row["shortage_qty"] > 0.000001:
             unit = escape(row["stock_uom"] or "库存单位")
             problems.append(f"贴纸 {code}（{warehouse}）：本次需要 {row['required_qty']:g} {unit}，可用 {row['available_qty']:g}，缺少 {row['shortage_qty']:g}。请先完成实际采购到货入库，或明确减少本次出库数量。")
-        elif not row["has_valuation"]:
-            problems.append(f"贴纸 {code}（{warehouse}）尚无有效入库成本，请先核对采购入库数量及真实成本；免费赠送不能代替库存成本。")
+        # Posted zero-valued stock is valid (e.g. service cost expensed separately).
+        # Keep the quantity guard; native receipts and ledgers own valuation checks.
     if problems:
         frappe.throw("<br>".join(problems), title="贴纸暂不能出库")
     return rows

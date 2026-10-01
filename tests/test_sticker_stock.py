@@ -1,4 +1,4 @@
-"""Only customer stickers require valued physical stock before delivery."""
+"""Customer stickers require physical stock; zero-valued posted stock is valid."""
 import ast
 import importlib.util
 from pathlib import Path
@@ -64,10 +64,12 @@ def test_chalk_stock_policy_is_untouched(env):
     env.m._balance.assert_not_called()
 
 
-def test_free_sticker_still_needs_stock_and_real_cost(env):
+def test_zero_valued_sticker_can_ship_but_still_requires_physical_stock(env):
     env.row.update(rate=0,allow_zero_valuation_rate=1)
     env.m._balance.return_value=(100,0)
-    with pytest.raises(ValueError,match='入库成本'):
+    assert env.m.validate_delivery_sticker_stock(env.doc)[0]['available_qty']==100
+    env.m._balance.return_value=(0,0)
+    with pytest.raises(ValueError,match='缺少 100'):
         env.m.validate_delivery_sticker_stock(env.doc)
 
 
