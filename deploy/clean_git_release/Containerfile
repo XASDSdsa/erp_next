@@ -1,0 +1,47 @@
+ARG BUILD_IMAGE
+ARG RUNTIME_IMAGE
+
+FROM ${BUILD_IMAGE} AS builder
+ARG BUILD_IMAGE
+ARG RUNTIME_IMAGE
+USER root
+RUN printf '%s\n' "$BUILD_IMAGE" | grep -Eq '^frappe/build@sha256:[0-9a-f]{64}$' \
+ && printf '%s\n' "$RUNTIME_IMAGE" | grep -Eq '^frappe/base@sha256:[0-9a-f]{64}$' \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --chown=frappe:0 source-repos/ /opt/git/
+COPY --chown=frappe:0 apps.json /opt/frappe/apps.json
+COPY --chown=frappe:0 source-remotes.json /opt/frappe/source-remotes.json
+USER frappe
+WORKDIR /home/frappe
+RUN bench init \
+      --frappe-path=file:///opt/git/frappe \
+      --frappe-branch=release-source \
+      --apps_path=/opt/frappe/apps.json \
+      --no-procfile \
+      --no-backups \
+      --skip-redis-config-generation \
+      --verbose \
+      /home/frappe/frappe-bench \
+ && printf '{}\n' > /home/frappe/frappe-bench/sites/common_site_config.json \
+ && python3 -c 'import json,subprocess; from pathlib import Path; remotes=json.loads(Path("/opt/frappe/source-remotes.json").read_text()); [(subprocess.run(["git","-C","/home/frappe/frappe-bench/apps/"+app,"remote","set-url",name,url],check=True)) for app,url in remotes.items() for name in subprocess.check_output(["git","-C","/home/frappe/frappe-bench/apps/"+app,"remote"],text=True).splitlines()]'
+
+FROM ${RUNTIME_IMAGE} AS runtime
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+ && rm -rf /var/lib/apt/lists/*
+COPY --chmod=0755 source-repos/erpnext/deploy/shipment_carrier_isolation/assets-entrypoint.sh /usr/local/bin/entrypoint.sh
+
+USER frappe
+COPY --from=builder --chown=frappe:0 /home/frappe/frappe-bench /home/frappe/frappe-bench
+WORKDIR /home/frappe/frappe-bench
+RUN chmod -R g=u /home/frappe/frappe-bench \
+ && test ! -e assets \
+ && mv sites/assets assets
+
+VOLUME ["/home/frappe/frappe-bench/sites", "/home/frappe/frappe-bench/logs"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/home/frappe/frappe-bench/env/bin/gunicorn", "--chdir=/home/frappe/frappe-bench/sites", "--bind=0.0.0.0:8000", "--threads=4", "--workers=2", "--worker-class=gthread", "--worker-tmp-dir=/dev/shm", "--timeout=120", "--preload", "frappe.app:application"]
