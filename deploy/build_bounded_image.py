@@ -129,6 +129,46 @@ def _pin_base(image_id):
     return tag
 
 
+def _flatten_base(base):
+    image_id = base["Id"]
+    tag = "leya/build-input:flat-" + image_id.removeprefix("sha256:")
+    existing = subprocess.check_output(
+        ["docker", "image", "ls", "--no-trunc", "--quiet", "--filter", "reference=" + tag], text=True
+    ).strip()
+    if existing:
+        flat = _inspect(tag)
+    else:
+        container = subprocess.check_output(
+            ["docker", "create", "--network=none", "--entrypoint=/bin/true", image_id], text=True
+        ).strip()
+        try:
+            exporter = subprocess.Popen(["docker", "export", container], stdout=subprocess.PIPE)
+            try:
+                platform = "/".join(base[key] for key in ("Os", "Architecture", "Variant") if base.get(key))
+                imported = subprocess.run(
+                    ["docker", "import", "--platform", platform, "--change",
+                     "LABEL org.leya.flattened-from=" + image_id, "-"],
+                    stdin=exporter.stdout, stdout=subprocess.PIPE, text=True,
+                )
+            finally:
+                exporter.stdout.close()
+                exported = exporter.wait()
+            if exported or imported.returncode:
+                raise RuntimeError(f"Filesystem flatten failed: export={exported}, import={imported.returncode}")
+            flat = _inspect(imported.stdout.strip())
+        finally:
+            subprocess.run(["docker", "rm", "--volumes", container], check=True, stdout=subprocess.DEVNULL)
+    if len(flat.get("RootFS", {}).get("Layers", [])) != 1:
+        raise ValueError("Flattened build input must contain exactly one layer")
+    if (flat["Config"].get("Labels") or {}).get("org.leya.flattened-from") != image_id:
+        raise ValueError("Flattened build input has the wrong source image")
+    if any(base.get(key) != flat.get(key) for key in ("Os", "Architecture", "Variant")):
+        raise ValueError("Flattened build input has the wrong platform")
+    if not existing:
+        subprocess.run(["docker", "tag", flat["Id"], tag], check=True)
+    return tag, flat["Id"]
+
+
 def _verify(base, candidate, labels):
     layers = candidate.get("RootFS", {}).get("Layers", [])
     if not 1 <= len(layers) <= 4:
@@ -151,8 +191,12 @@ def build(base_image, candidate_image, context_dir, labels, build_apps=("flow",)
     manifest = json.loads((context / "candidate-sources.json").read_text())
     deleted = _deleted_paths(manifest)
     metadata = _runtime_instructions(base["Config"], labels)
-    base_tag = _pin_base(base["Id"])
-    lines = [f"FROM {base_tag} AS builder", "USER root",
+    base_tag, input_id = (_flatten_base(base) if len(base["RootFS"]["Layers"]) > 4
+                          else (_pin_base(base["Id"]), base["Id"]))
+    build_environment = _runtime_instructions(
+        {key: base["Config"][key] for key in ("Env", "Shell") if key in base["Config"]}, {}
+    )
+    lines = [f"FROM {base_tag} AS builder", *build_environment, "USER root",
              "RUN " + json.dumps(["python3", "-c", CLEAN_SOURCES, BENCH + "/apps",
                                   json.dumps(list(manifest)), json.dumps(deleted)])]
     lines += [f'COPY --chown=frappe:frappe ["app-source/", "{BENCH}/apps/"]',
@@ -165,13 +209,13 @@ def build(base_image, candidate_image, context_dir, labels, build_apps=("flow",)
     dockerfile = context / "Dockerfile.bounded"
     dockerfile.write_text("\n".join(lines) + "\n")
     (context / "Dockerfile.bounded.dockerignore").write_text("**\n!app-source/\n!app-source/**\n")
-    for reference in (base_image, base_tag):
-        if _inspect(reference)["Id"] != base["Id"]:
+    for reference, expected_id in ((base_image, base["Id"]), (base_tag, input_id)):
+        if _inspect(reference)["Id"] != expected_id:
             raise ValueError("Baseline image reference changed before build")
     subprocess.run(["docker", "build", "--pull=false", "--file", str(dockerfile),
                     "--tag", candidate_image, str(context)], check=True)
-    for reference in (base_image, base_tag):
-        if _inspect(reference)["Id"] != base["Id"]:
+    for reference, expected_id in ((base_image, base["Id"]), (base_tag, input_id)):
+        if _inspect(reference)["Id"] != expected_id:
             raise ValueError("Baseline image reference changed during build")
     candidate = _inspect(candidate_image)
     _verify(base, candidate, labels)

@@ -5,9 +5,9 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from build_bounded_image import CLEAN_SOURCES, _deleted_paths, _pin_base, _quote, _runtime_instructions, _verify
+from build_bounded_image import CLEAN_SOURCES, _deleted_paths, _flatten_base, _pin_base, _quote, _runtime_instructions, _verify
 
 
 class BoundedImageTest(unittest.TestCase):
@@ -60,6 +60,45 @@ class BoundedImageTest(unittest.TestCase):
                 _deleted_paths({"flow": {"deleted": [path]}})
         with self.assertRaises(ValueError):
             _deleted_paths({"../flow": {"deleted": []}})
+
+    def test_flatten_requires_both_streams_to_succeed_and_removes_anonymous_volumes(self):
+        base = {"Id": "sha256:" + "a" * 64, "Os": "linux", "Architecture": "amd64"}
+        flat = {**base, "Id": "sha256:" + "b" * 64, "RootFS": {"Layers": ["one"]},
+                "Config": {"Labels": {"org.leya.flattened-from": base["Id"]}}}
+        for export_code, import_code in ((0, 0), (1, 0), (0, 1)):
+            with self.subTest(export=export_code, import_=import_code), \
+                 patch("build_bounded_image.subprocess.check_output", side_effect=["", "container-id\n"]), \
+                 patch("build_bounded_image.subprocess.Popen") as popen, \
+                 patch("build_bounded_image.subprocess.run") as run, \
+                 patch("build_bounded_image._inspect", return_value=flat):
+                popen.return_value = Mock(wait=Mock(return_value=export_code))
+                run.return_value = subprocess.CompletedProcess([], import_code, stdout=flat["Id"] + "\n")
+                if export_code or import_code:
+                    with self.assertRaises(RuntimeError):
+                        _flatten_base(base)
+                else:
+                    self.assertEqual(_flatten_base(base), ("leya/build-input:flat-" + "a" * 64, flat["Id"]))
+                commands = [call.args[0] for call in run.call_args_list]
+                self.assertIn(["docker", "rm", "--volumes", "container-id"], commands)
+                self.assertEqual(any(command[1] == "tag" for command in commands), not (export_code or import_code))
+                popen.return_value.stdout.close.assert_called_once()
+
+    def test_flatten_cache_requires_source_label_and_single_layer(self):
+        base = {"Id": "sha256:" + "a" * 64, "Os": "linux", "Architecture": "amd64"}
+        flat = {**base, "Id": "sha256:" + "b" * 64, "RootFS": {"Layers": ["one"]},
+                "Config": {"Labels": {"org.leya.flattened-from": base["Id"]}}}
+        with patch("build_bounded_image.subprocess.check_output", return_value=flat["Id"]), \
+             patch("build_bounded_image._inspect", return_value=flat), \
+             patch("build_bounded_image.subprocess.Popen") as popen:
+            self.assertEqual(_flatten_base(base)[1], flat["Id"])
+            flat["RootFS"]["Layers"].append("two")
+            with self.assertRaises(ValueError):
+                _flatten_base(base)
+            flat["RootFS"]["Layers"] = ["one"]
+            flat["Config"]["Labels"]["org.leya.flattened-from"] = "wrong"
+            with self.assertRaises(ValueError):
+                _flatten_base(base)
+            popen.assert_not_called()
 
     def test_git_cleanup_is_limited_to_selected_apps(self):
         with tempfile.TemporaryDirectory() as directory:
