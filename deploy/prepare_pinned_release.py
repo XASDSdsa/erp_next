@@ -23,6 +23,28 @@ def load_module(name, path):
     return module
 
 
+def pin_baseline_build_outputs(sources, image_id):
+    """Identify the inspected legacy CRM build without weakening Git checks.
+
+    Its nested, unfrozen postinstall upgraded cropperjs dependencies, and Vite
+    reformatted auto-imports.d.ts. Only this immutable baseline may have these
+    bytes; candidate source remains the unmodified Git archive.
+    """
+    if image_id != "sha256:1cbd9e1faf265ea7266320a2f71387953ef2df2628f30abf0808df4c9b2796ef":
+        return
+    crm = sources["crm"]
+    assert crm["sha"] == "a82db7522f416433aa792fbe572116e23e62abc2"
+    outputs = {
+        "frontend/auto-imports.d.ts": ("7099468b538479c823294707e289600fcb7dd9c5da0faa8c07b38a6afac0d76f", "194ee3276321bf899a3206b1ff852cf99cc86412bfc90ac9abbd6ad7911e2dac"),
+        "frontend/yarn.lock": ("c5a0d03b6a2f74fa092e07646a2ead0bd6f4c804d2868647be40e44b7911f602", "196592c530cd061a21df6c97a507fa18a67cb32bebf20c2543766479d4fceb83"),
+    }
+    crm["build_outputs"] = {}
+    for path, (git_hash, build_hash) in outputs.items():
+        assert crm["files"][path] == git_hash, "unexpected_baseline_git_file:" + path
+        crm["build_outputs"][path] = {"git_sha256": git_hash, "image_sha256": build_hash}
+        crm["files"][path] = build_hash
+
+
 def verify_pins(root):
     """Recheck all seven Git pins and candidate Git identities before switching."""
     root = Path(root).resolve()
@@ -100,6 +122,7 @@ def prepare(root):
         assert (root / "git-source/shipping/deploy/sf_provider_migration" / filename).read_bytes() == (root / filename).read_bytes(), "release_tool_not_from_git:" + filename
     for filename in ("prepare_pinned_release.py", "build_bounded_image.py"):
         assert (root / "git-source/erpnext/deploy" / filename).read_bytes() == (root / filename).read_bytes(), "build_tool_not_from_git:" + filename
+    pin_baseline_build_outputs(baseline_sources, base_id)
     release.save("changed-paths.json", changed)
     release.save("baseline-sources.json", baseline_sources)
     release.save("candidate-sources.json", candidate_sources)
