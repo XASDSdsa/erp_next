@@ -104,6 +104,7 @@ def sources(r, verifier, inputs, inputs_path):
                 assert baseline[app]["files"][path] == hashes["git_sha256"], prefix.lower() + "_original_git_hash_mismatch:" + path
                 assert re.fullmatch(r"[0-9a-f]{64}", hashes["built_sha256"]), "invalid_" + prefix.lower() + "_build_hash"
                 baseline[app]["files"][path] = hashes["built_sha256"]
+                target[app]["files"][path] = hashes["built_sha256"]
     r.save("baseline-sources.json", baseline)
     r.save("candidate-sources.json", target)
     r.save("changed-paths.json", changed)
