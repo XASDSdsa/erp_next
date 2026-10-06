@@ -94,13 +94,16 @@ def sources(r, verifier, inputs, inputs_path):
     for name in CLEAN_TOOLS:
         assert (Path("source-repos/erpnext/deploy/clean_git_release") / name).read_bytes() == (ROOT / name).read_bytes(), "clean_tool_not_from_target_git:" + name
     r.save("baseline-git-sources.json", baseline)
-    allowed = inputs.get("CRM_BASE_BUILD_OUTPUTS", {})
-    if allowed:
-        assert inputs["CRM_BASE_BUILD_REV"] == records["crm"]["baseline"], "crm_build_revision_mismatch"
-        for path, hashes in allowed.items():
-            assert baseline["crm"]["files"][path] == hashes["git_sha256"], "crm_original_git_hash_mismatch:" + path
-            assert re.fullmatch(r"[0-9a-f]{64}", hashes["built_sha256"]), "invalid_crm_build_hash"
-            baseline["crm"]["files"][path] = hashes["built_sha256"]
+    allowed_by_app = {}
+    for prefix, app in (("CRM", "crm"), ("PAYMENTS", "payments")):
+        allowed = inputs.get(prefix + "_BASE_BUILD_OUTPUTS", {})
+        allowed_by_app[app] = allowed
+        if allowed:
+            assert inputs[prefix + "_BASE_BUILD_REV"] == records[app]["baseline"], prefix.lower() + "_build_revision_mismatch"
+            for path, hashes in allowed.items():
+                assert baseline[app]["files"][path] == hashes["git_sha256"], prefix.lower() + "_original_git_hash_mismatch:" + path
+                assert re.fullmatch(r"[0-9a-f]{64}", hashes["built_sha256"]), "invalid_" + prefix.lower() + "_build_hash"
+                baseline[app]["files"][path] = hashes["built_sha256"]
     r.save("baseline-sources.json", baseline)
     r.save("candidate-sources.json", target)
     r.save("changed-paths.json", changed)
@@ -115,7 +118,7 @@ def sources(r, verifier, inputs, inputs_path):
     for service in ("backend", "frontend"):
         r.verify(r.required("PROJECT") + "-" + service + "-1", "baseline-sources.json", assets_match="baseline-assets.json")
     r.prepare_metadata_permissions()
-    r.save("all-source-evidence.json", {"base_id": base_id, "sources": records, "crm_baseline_build_outputs": allowed,
+    r.save("all-source-evidence.json", {"base_id": base_id, "sources": records, "baseline_build_outputs": allowed_by_app,
         "inputs_sha256": r.sha(inputs_path), "scripts": r.scripts(), "clean_tools": {name: r.sha(ROOT / name) for name in CLEAN_TOOLS},
         "prepared_files": {name: r.sha(ROOT / name) for name in PREPARED_FILES}})
     print("CLEAN_GIT_SOURCES_READY", flush=True)
