@@ -60,7 +60,9 @@ def sources(r, verifier, inputs, inputs_path):
     for prefix, app, baseline_key, alias in APPS:
         remote, branch = r.required(prefix + "_REMOTE"), r.required(prefix + "_BRANCH")
         revision, old = r.required(prefix + "_REV"), r.required(baseline_key)
-        assert re.fullmatch(r"git@github\.com:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\.git", remote), "ssh_remote_required:" + app
+        user_remote = re.fullmatch(r"git@github\.com:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\.git", remote)
+        official_payments = app == "payments" and remote == "https://github.com/frappe/payments.git"
+        assert user_remote or official_payments, "approved_github_remote_required:" + app
         assert all(re.fullmatch(r"[0-9a-f]{40}", value) for value in (revision, old)), "invalid_revision:" + app
         head = r.run(["git", "ls-remote", remote, "refs/heads/" + branch], capture=True).split()
         assert head and head[0] == revision, "remote_head_changed:" + app

@@ -17,7 +17,7 @@ source-repos/
   ...            # Every other application selected for this release
 ```
 
-Fetch each owning repository through its configured SSH remote. Resolve the requested latest branch to an exact commit, check out that commit, and create the local `release-source` branch at that same commit. Record every repository URL, source branch, commit SHA, and both image digests in the release manifest before building. Include each checkout's `.git` in the context; do not exclude it with `.dockerignore` or include local credentials, SSH keys, business data, or production site configuration.
+Fetch each user-owned repository through its configured SSH remote. The only approved external dependency is the official `https://github.com/frappe/payments.git` source for the Payments app. Resolve every requested branch to an exact commit, check out that commit, and create the local `release-source` branch at that same commit. Record every repository URL, source branch, commit SHA, and both image digests in the release manifest before building. Include each checkout's `.git` in the context; do not exclude it with `.dockerignore` or include local credentials, SSH keys, business data, or production site configuration.
 
 Generate `apps.json` from that manifest for every app except Frappe, which has its own `bench init` arguments:
 
@@ -47,7 +47,7 @@ Before deployment, verify every application's runtime Git HEAD against the relea
 
 Archive Shipping's `deploy/sf_provider_migration` runner from the selected Shipping Git commit into a fresh release directory. Place this directory's `prepare.py`, `Containerfile`, and `README.md` beside that runner, byte for byte from the selected ERPNext commit. Keep the runner's original `Dockerfile`, `.dockerignore`, and all other tool files unchanged. The preparer checks both sets against their owning Git commits.
 
-Write `release-inputs.json` with the existing runner environment values plus `BASE_IMAGE_ID`, `BUILD_IMAGE`, `RUNTIME_IMAGE`, and each app's SSH remote, branch, target SHA, and baseline SHA. Additional prefixes are `FRAPPE`, `PAYMENTS`, `CRM`, and `INSIGHTS`, each using `<PREFIX>_BASE_REV`; the original four apps retain the runner's `BASE_ERPNEXT_REV`, `BASE_SF_REV`, `BASE_SHIPPING_REV`, and `BASE_FLOW_REV` names. Payments requires a separately confirmed baseline commit.
+Write `release-inputs.json` with the existing runner environment values plus `BASE_IMAGE_ID`, `BUILD_IMAGE`, `RUNTIME_IMAGE`, and each app's remote, branch, target SHA, and baseline SHA. Additional prefixes are `FRAPPE`, `PAYMENTS`, `CRM`, and `INSIGHTS`, each using `<PREFIX>_BASE_REV`; the original four apps retain the runner's `BASE_ERPNEXT_REV`, `BASE_SF_REV`, `BASE_SHIPPING_REV`, and `BASE_FLOW_REV` names. Payments is pinned to the official `frappe/payments` commit. If the running image contains a documented local build difference, record its exact path and hashes with `PAYMENTS_BASE_BUILD_OUTPUTS` so the candidate comparison is explicit rather than silently ignored.
 
 The confirmed historic CRM build outputs may be supplied as `CRM_BASE_BUILD_OUTPUTS`, mapping each exact tracked path to `git_sha256` and `built_sha256`, together with `CRM_BASE_BUILD_REV`. The preparer checks the original Git file, revision, and immutable baseline image before using those hashes for baseline verification only. It saves the untouched Git manifest separately. Candidate files always use the target Git hashes; any new generated-source drift fails verification for diagnosis.
 
