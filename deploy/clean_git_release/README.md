@@ -28,7 +28,7 @@ Generate `apps.json` from that manifest for every app except Frappe, which has i
 ]
 ```
 
-The example list is not the complete production app list. The release caller must include all required apps and respect their dependencies. The retired SF app is retained only as the historic installed-app marker; it adds no new functionality. SF carrier behavior belongs to Shipping's `sf_international` module. Preserve historic documents, credentials, waybills, and accounting records.
+The example list is not the complete production app list. The release caller must include all required runtime apps and respect their dependencies. The retired standalone SF app is fetched only as a migration source and is deliberately excluded from generated `apps.json`; it must never be installed in the candidate bench. SF carrier behavior belongs to Shipping's `erpnext_shipping.sf_international` module. Preserve historic documents, credentials, waybills, and accounting records.
 
 Both stages install `libgl1` and `libglib2.0-0` for Flow's native dependencies. The final image contains only the newly built bench plus the official runtime base and these system packages. All application `.git` directories and app `public/dist` outputs remain available for verification. The generated `sites/assets` directory moves intact to `bench/assets`; the existing ERPNext entrypoint atomically links it into the mounted sites volume and executes the configured service.
 

@@ -102,7 +102,11 @@ def sources(r, verifier, inputs, inputs_path):
     r.save("baseline-sources.json", baseline)
     r.save("candidate-sources.json", target)
     r.save("changed-paths.json", changed)
-    r.save("apps.json", [{"url": "file:///opt/git/" + app, "branch": "release-source"} for _, app, _, _ in APPS if app != "frappe"])
+    # ``sf_international`` is retained only as a migration source.  The
+    # runtime carrier implementation is owned by ``erpnext_shipping`` and
+    # must be the only SF app installed in the candidate bench.
+    r.save("apps.json", [{"url": "file:///opt/git/" + app, "branch": "release-source"}
+                          for _, app, _, _ in APPS if app not in {"frappe", "sf_international"}])
     r.save("source-remotes.json", {app: source["remote"] for app, source in records.items()})
     Path("Containerfile.dockerignore").write_text("**\n!source-repos/\n!source-repos/**\n!apps.json\n!source-remotes.json\n")
     r.verify(base, "baseline-sources.json", image=True, assets_out="baseline-assets.json")
