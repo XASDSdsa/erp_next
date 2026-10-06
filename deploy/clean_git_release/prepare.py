@@ -160,7 +160,9 @@ def finalize(r, inputs_path):
     r.run(["docker", "run", "--rm", "--network", "none", "--workdir", r.SITES, "--entrypoint", r.PYTHON, candidate, "-c", code])
     evidence["candidate_id"] = r.image_id(candidate)
     r.save("all-source-evidence.json", evidence)
-    r.save("release-state.json", {"scripts": r.scripts(), "base_id": evidence["base_id"], "candidate_id": evidence["candidate_id"],
+    build_base = r.required("BUILD_IMAGE")
+    r.save("release-state.json", {"scripts": r.scripts(), "base_id": evidence["base_id"],
+        "build_base_image": build_base, "build_base_id": r.image_id(build_base), "candidate_id": evidence["candidate_id"],
         "revisions": {app: source["revision"] for app, source in evidence["sources"].items() if app in {"erpnext", "sf_international", "erpnext_shipping", "flow"}}})
     print("CANDIDATE_IMAGE_READY; run the pinned runner rehearsal before deployment", flush=True)
 
