@@ -26,7 +26,7 @@ RUN bench init \
       --verbose \
       /home/frappe/frappe-bench \
  && printf '{}\n' > /home/frappe/frappe-bench/sites/common_site_config.json \
- && python3 -c 'import json,subprocess; from pathlib import Path; remotes=json.loads(Path("/opt/frappe/source-remotes.json").read_text()); [(subprocess.run(["git","-C","/home/frappe/frappe-bench/apps/"+app,"remote","set-url",name,url],check=True)) for app,url in remotes.items() for name in subprocess.check_output(["git","-C","/home/frappe/frappe-bench/apps/"+app,"remote"],text=True).splitlines()]'
+ && python3 -c 'import json,subprocess; from pathlib import Path; remotes=json.loads(Path("/opt/frappe/source-remotes.json").read_text()); apps=Path("/home/frappe/frappe-bench/apps"); [(subprocess.run(["git","-C",str(apps/app),"remote","set-url",name,url],check=True)) for app,url in remotes.items() if (apps/app).is_dir() for name in subprocess.check_output(["git","-C",str(apps/app),"remote"],text=True).splitlines()]'
 
 FROM ${RUNTIME_IMAGE} AS runtime
 USER root
