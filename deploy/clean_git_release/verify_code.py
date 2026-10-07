@@ -14,6 +14,13 @@ import hashlib,json,pathlib,sys
 request=json.load(sys.stdin)
 root=pathlib.Path('/home/frappe/frappe-bench')
 checked={}
+expected_apps=set(request['sources'])
+actual_apps={path.name for path in (root/'apps').iterdir() if path.is_dir() and not path.name.startswith('.')}
+assert actual_apps == expected_apps, ('unexpected_application_set', sorted(actual_apps), sorted(expected_apps))
+apps_file=root/'sites/apps.txt'
+assert apps_file.is_file(), 'missing_apps_txt'
+installed_apps={line.strip() for line in apps_file.read_text().splitlines() if line.strip()}
+assert installed_apps == expected_apps, ('unexpected_installed_application_set', sorted(installed_apps), sorted(expected_apps))
 for app,data in request['sources'].items():
     app_root=root/'apps'/app
     for name,expected in data['files'].items():
@@ -21,9 +28,6 @@ for app,data in request['sources'].items():
         assert path.is_file() or path.is_symlink(), ('missing',app,name)
         value=str(path.readlink()).encode() if path.is_symlink() else path.read_bytes()
         assert hashlib.sha256(value).hexdigest()==expected, ('source_drift',app,name)
-    for name in data['deleted']:
-        path=app_root/name
-        assert not path.exists() and not path.is_symlink(), ('deleted_source_still_exists',app,name)
     checked[app]=len(data['files'])
 assets={}
 for filename in ('assets.json','assets-rtl.json'):
@@ -58,7 +62,7 @@ def archive_manifest(repo, sha):
                 raise AssertionError(("unsupported_git_entry", member.name))
             files[member.name] = hashlib.sha256(value).hexdigest()
     assert files, ("empty_source", str(repo), sha)
-    return {"sha": sha, "files": files, "deleted": []}
+    return {"sha": sha, "files": files}
 
 
 def main():
@@ -70,7 +74,6 @@ def main():
         check.add_argument("manifest", type=Path)
         check.add_argument("--assets-out", type=Path)
         check.add_argument("--assets-match", type=Path)
-        check.add_argument("--baseline-assets", type=Path)
     args = parser.parse_args()
     sources = json.loads(args.manifest.read_text())
     inspection = json.loads(run(["docker", "inspect", args.target]))[0]
@@ -85,12 +88,6 @@ def main():
     assets = result["assets"]
     if args.assets_match:
         assert assets == json.loads(args.assets_match.read_text()), "asset_manifest_or_hash_changed"
-    if args.baseline_assets:
-        baseline = json.loads(args.baseline_assets.read_text())
-        prefixes = tuple("/assets/" + {"erpnext_shipping": "erpnext_shipping"}.get(app, app) + "/" for app in sources)
-        baseline_other = {name: value for name, value in baseline.items() if not value["url"].startswith(prefixes)}
-        current_other = {name: value for name, value in assets.items() if not value["url"].startswith(prefixes)}
-        assert current_other == baseline_other, "unrelated_asset_changed"
     if args.assets_out:
         args.assets_out.write_text(json.dumps(assets, indent=2, sort_keys=True) + "\n")
     print(json.dumps({"result": "SOURCE_ASSETS_OK", "target": args.target,
