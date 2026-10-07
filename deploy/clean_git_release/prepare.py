@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare one clean Git release using the pinned Shipping release operations."""
+"""Prepare one clean Git release from exact Git repositories."""
 import argparse
 import importlib.util
 import json
@@ -13,12 +13,11 @@ APPS = (
     ("PAYMENTS", "payments", "PAYMENTS_BASE_REV", "payments"),
     ("ERP", "erpnext", "BASE_ERPNEXT_REV", "erpnext"),
     ("SHIPPING", "erpnext_shipping", "BASE_SHIPPING_REV", "shipping"),
-    ("SF", "sf_international", "BASE_SF_REV", "sf"),
     ("CRM", "crm", "CRM_BASE_REV", "crm"),
     ("INSIGHTS", "insights", "INSIGHTS_BASE_REV", "insights"),
     ("FLOW", "flow", "BASE_FLOW_REV", "flow"),
 )
-CLEAN_TOOLS = ("prepare.py", "Containerfile", "README.md")
+CLEAN_TOOLS = ("prepare.py", "release.py", "verify_code.py", "Containerfile", "README.md", "assets-entrypoint.sh")
 PREPARED_FILES = ("baseline-git-sources.json", "baseline-sources.json", "candidate-sources.json",
                   "changed-paths.json", "apps.json", "source-remotes.json", "Containerfile.dockerignore", "baseline-assets.json")
 GIT_CHECK = """import json,subprocess,sys
@@ -84,13 +83,11 @@ def sources(r, verifier, inputs, inputs_path):
         target[app] = verifier.archive_manifest(repo, revision)
         target[app]["deleted"] = sorted(set(baseline[app]["files"]) - set(target[app]["files"]))
         changed[app] = r.run(["git", "-C", repo, "diff", "--name-only", old, revision], capture=True).splitlines()
-        records[app] = {"remote": remote, "branch": branch, "revision": revision, "baseline": old, "label": "org.leya." + alias + "-revision"}
+        records[app] = {"remote": remote, "branch": branch, "revision": revision, "baseline": old, "label": "org.erpnext." + alias + "-revision"}
     flow = Path("app-source/flow")
     if not flow.is_symlink():
         flow.symlink_to("../source-repos/flow", target_is_directory=True)
     assert flow.resolve() == Path("source-repos/flow").resolve()
-    for name in r.TOOLS:
-        assert (Path("source-repos/erpnext_shipping/deploy/sf_provider_migration") / name).read_bytes() == (ROOT / name).read_bytes(), "runner_not_from_target_git:" + name
     for name in CLEAN_TOOLS:
         assert (Path("source-repos/erpnext/deploy/clean_git_release") / name).read_bytes() == (ROOT / name).read_bytes(), "clean_tool_not_from_target_git:" + name
     r.save("baseline-git-sources.json", baseline)
@@ -108,17 +105,13 @@ def sources(r, verifier, inputs, inputs_path):
     r.save("baseline-sources.json", baseline)
     r.save("candidate-sources.json", target)
     r.save("changed-paths.json", changed)
-    # ``sf_international`` is retained only as a migration source.  The
-    # runtime carrier implementation is owned by ``erpnext_shipping`` and
-    # must be the only SF app installed in the candidate bench.
     r.save("apps.json", [{"url": "file:///opt/git/" + app, "branch": "release-source"}
-                          for _, app, _, _ in APPS if app not in {"frappe", "sf_international"}])
+                          for _, app, _, _ in APPS if app != "frappe"])
     r.save("source-remotes.json", {app: source["remote"] for app, source in records.items()})
-    Path("Containerfile.dockerignore").write_text("**\n!source-repos/\n!source-repos/**\n!apps.json\n!source-remotes.json\n")
+    Path("Containerfile.dockerignore").write_text("**\n!source-repos/\n!source-repos/**\n!apps.json\n!source-remotes.json\n!assets-entrypoint.sh\n")
     r.verify(base, "baseline-sources.json", image=True, assets_out="baseline-assets.json")
     for service in ("backend", "frontend"):
         r.verify(r.required("PROJECT") + "-" + service + "-1", "baseline-sources.json", assets_match="baseline-assets.json")
-    r.prepare_metadata_permissions()
     r.save("all-source-evidence.json", {"base_id": base_id, "sources": records, "baseline_build_outputs": allowed_by_app,
         "inputs_sha256": r.sha(inputs_path), "scripts": r.scripts(), "clean_tools": {name: r.sha(ROOT / name) for name in CLEAN_TOOLS},
         "prepared_files": {name: r.sha(ROOT / name) for name in PREPARED_FILES}})
@@ -153,7 +146,7 @@ def finalize(r, inputs_path):
     labels = r.inspection(candidate)["Config"].get("Labels") or {}
     for app, source in evidence["sources"].items():
         assert labels.get(source["label"]) == source["revision"], "candidate_revision_label_mismatch:" + app
-    assert labels.get("com.leya.release") == r.required("RELEASE_NAME"), "candidate_release_label_mismatch"
+    assert labels.get("com.erpnext.release") == r.required("RELEASE_NAME"), "candidate_release_label_mismatch"
     evidence["candidate_git"] = json.loads(r.run(
         ["docker", "run", "--rm", "-i", "--network", "none", "--entrypoint", r.PYTHON, candidate, "-c", GIT_CHECK],
         capture=True, input=json.dumps(evidence["sources"]).encode()))
@@ -164,8 +157,8 @@ def finalize(r, inputs_path):
     build_base = r.required("BUILD_IMAGE")
     r.save("release-state.json", {"scripts": r.scripts(), "base_id": evidence["base_id"],
         "build_base_image": build_base, "build_base_id": r.image_id(build_base), "candidate_id": evidence["candidate_id"],
-        "revisions": {app: source["revision"] for app, source in evidence["sources"].items() if app in {"erpnext", "sf_international", "erpnext_shipping", "flow"}}})
-    print("CANDIDATE_IMAGE_READY; run the pinned runner rehearsal before deployment", flush=True)
+        "revisions": {app: source["revision"] for app, source in evidence["sources"].items() if app in {"erpnext", "erpnext_shipping", "flow"}}})
+    print("CANDIDATE_IMAGE_READY; build-only release; no migration or deployment was run", flush=True)
 
 
 def main():
@@ -187,7 +180,7 @@ def main():
             command += ["--build-arg", key + "=" + r.required(key)]
         for source in evidence["sources"].values():
             command += ["--label", source["label"] + "=" + source["revision"]]
-        command += ["--label", "com.leya.release=" + r.required("RELEASE_NAME"), "."]
+        command += ["--label", "com.erpnext.release=" + r.required("RELEASE_NAME"), "."]
         r.run(command)
         finalize(r, inputs_path)
     else:

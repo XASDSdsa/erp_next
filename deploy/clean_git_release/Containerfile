@@ -33,7 +33,7 @@ USER root
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/*
-COPY --chmod=0755 source-repos/erpnext/deploy/shipment_carrier_isolation/assets-entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY --chmod=0755 assets-entrypoint.sh /usr/local/bin/entrypoint.sh
 
 USER frappe
 COPY --from=builder --chown=frappe:0 /home/frappe/frappe-bench /home/frappe/frappe-bench
