@@ -309,5 +309,9 @@ def verify_receipt(doc, order, amounts, posting_date, transaction_id, reference_
 	return {"verified": True, "submitted": doc.docstatus == 1, "gl_generated": bool(check_gl), "journal_entry": doc.name,
 		"sales_order": order.name, "customer": order.customer, "currency": CURRENCY, **{key: float(value) for key, value in amounts.items()},
 		"gl_references": gl_references, "company_currency": company.default_currency,
+		"actual_receipt_currency": CURRENCY,
+		"actual_receipt_note": f"PayPal实际收款、手续费和净到账均为 {CURRENCY}。",
+		"company_base_currency": company.default_currency,
+		"base_currency_note": f"{company.default_currency}仅用于ERP总账和报表折算，不代表实际收到{company.default_currency}，也不代表发生换汇或提现。",
 		"base_debit": float(sum((value["debit"] for value in ledger_expected.values()), Decimal(0))),
 		"base_credit": float(sum((value["credit"] for value in ledger_expected.values()), Decimal(0)))}

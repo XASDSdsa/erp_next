@@ -209,7 +209,11 @@ class PayPalAccountingTests(unittest.TestCase):
 	def test_zero_fee_omits_zero_posting_and_still_verifies(self):
 		doc, amounts = self._build("100", "0", "100")
 		self.assertEqual(len(doc.accounts), 2)
-		self.assertTrue(self._verify(doc, amounts, check_gl=False, new_receipt=True)["verified"])
+		result = self._verify(doc, amounts, check_gl=False, new_receipt=True)
+		self.assertTrue(result["verified"])
+		self.assertEqual(result["actual_receipt_currency"], "USD")
+		self.assertEqual(result["company_base_currency"], "CNY")
+		self.assertIn("不代表实际收到CNY", result["base_currency_note"])
 
 	def test_native_allocation_roundoff_can_exist_in_gl_only(self):
 		doc, amounts = self._build("0.02", "0", "0.02")
