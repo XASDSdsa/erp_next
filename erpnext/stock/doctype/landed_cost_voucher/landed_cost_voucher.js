@@ -10,7 +10,7 @@ erpnext.stock.LandedCostVoucher = class LandedCostVoucher extends erpnext.stock.
 			<table class="table table-bordered" style="background-color: var(--scrollbar-track-color);">
 				<tr><td>
 					<h4>
-						<i class="fa fa-hand-right"></i>
+						<svg class="icon icon-sm"><use href="#icon-info"></use></svg>
 						${__("Notes")}:
 					</h4>
 					<ul>
@@ -114,9 +114,19 @@ erpnext.stock.LandedCostVoucher = class LandedCostVoucher extends erpnext.stock.
 					total_charges += item.applicable_charges;
 				});
 
-				if (total_charges != this.frm.doc.total_taxes_and_charges) {
-					var diff = this.frm.doc.total_taxes_and_charges - flt(total_charges);
-					items.slice(-1)[0].applicable_charges += diff;
+				var charge_precision = precision("applicable_charges", items[0]);
+				var total = flt(this.frm.doc.total_taxes_and_charges);
+				var sign = total < 0 ? -1 : 1;
+				var diff = flt(total - total_charges, charge_precision);
+				for (const item of items.slice().reverse()) {
+					if (!diff) break;
+					var share = flt(item.applicable_charges) * sign;
+					var adjustment = diff * sign > 0 ? diff : sign * Math.max(diff * sign, -share);
+					item.applicable_charges = flt(
+						flt(item.applicable_charges) + adjustment,
+						charge_precision
+					);
+					diff = flt(diff - adjustment, charge_precision);
 				}
 				refresh_field("items");
 			}

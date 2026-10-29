@@ -75,6 +75,7 @@ class ProcessStatementOfAccounts(Document):
 		sender: DF.Link | None
 		show_future_payments: DF.Check
 		show_net_values_in_party_account: DF.Check
+		show_opening_entries: DF.Check
 		show_remarks: DF.Check
 		start_date: DF.Date | None
 		subject: DF.Data | None
@@ -207,10 +208,10 @@ def get_statement_dict(doc, get_statement_dict=False):
 		if doc.report == "General Ledger":
 			filters.update(get_gl_filters(doc, entry, tax_id, presentation_currency))
 			col, res = get_soa(filters)
-			for x in [0, -2, -1]:
-				res[x]["account"] = res[x]["account"].replace("'", "")
 			if len(res) == 3:
 				continue
+			for x in [0, -2, -1]:
+				res[x]["account"] = (res[x]["account"] or "").replace("'", "")
 		else:
 			filters.update(get_ar_filters(doc, entry))
 			ar_res = get_ar_soa(filters)
@@ -270,7 +271,7 @@ def get_gl_filters(doc, entry, tax_id, presentation_currency):
 		"categorize_by": doc.categorize_by,
 		"currency": doc.currency,
 		"project": [p.project_name for p in doc.project],
-		"show_opening_entries": 0,
+		"show_opening_entries": doc.show_opening_entries,
 		"include_default_book_entries": 0,
 		"tax_id": tax_id if tax_id else None,
 		"show_net_values_in_party_account": doc.show_net_values_in_party_account,
